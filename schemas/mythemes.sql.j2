@@ -1,0 +1,5 @@
+        CREATE TABLE mythemes (
+            id SERIAL PRIMARY KEY,
+            sentence TEXT NOT NULL,
+            embedding VECTOR({{ dim }}) NOT NULL
+        );

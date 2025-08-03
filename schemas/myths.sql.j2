@@ -1,0 +1,7 @@
+CREATE TABLE myths (
+            id SERIAL PRIMARY KEY,
+            embedding VECTOR({{ dim }}) NOT NULL,
+            embedding_ids INTEGER[] NOT NULL,
+            offsets VECTOR({{ dim }})[] NOT NULL,
+            weights DOUBLE PRECISION[] NOT NULL
+        );
