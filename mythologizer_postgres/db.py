@@ -6,9 +6,10 @@ from contextlib import contextmanager
 from functools import lru_cache
 
 import psycopg2
-from psycopg2 import sql
+from pgvector.psycopg2 import register_vector
 
-from sqlalchemy import create_engine, text
+
+from sqlalchemy import create_engine, text, event
 from sqlalchemy.engine import URL, Engine
 from sqlalchemy.orm import sessionmaker, Session
 
@@ -41,7 +42,14 @@ def build_url() -> URL:
 
 @lru_cache
 def get_engine() -> Engine:
-    return create_engine(build_url(), pool_pre_ping=True, future=True)
+    engine = create_engine(build_url(), pool_pre_ping=True, future=True)
+
+    @event.listens_for(engine, "connect")
+    def on_connect(dbapi_conn, _):
+        # register pgvector adapter so VECTOR columns come back as Vector objects
+        register_vector(dbapi_conn)
+
+    return engine
 
 
 def get_session() -> Session:
