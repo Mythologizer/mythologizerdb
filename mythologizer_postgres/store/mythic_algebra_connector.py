@@ -7,7 +7,6 @@ import numpy as np
 from typing import List, Tuple, Union, Optional
 from numpy.typing import NDArray
 
-# Import mythic algebra functions
 from mythicalgebra import (
     infer_embedding_dim,
     num_mythemes,
