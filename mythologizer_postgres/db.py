@@ -5,8 +5,8 @@ from typing import Optional, Mapping, Sequence, Dict, Iterator
 from contextlib import contextmanager
 from functools import lru_cache
 
-import psycopg2
-from pgvector.psycopg2 import register_vector
+import psycopg
+from pgvector.psycopg import register_vector
 
 
 from sqlalchemy import create_engine, text, event
@@ -31,7 +31,7 @@ def need(name: str) -> str:
 
 def build_url() -> URL:
     return URL.create(
-        drivername="postgresql+psycopg2",
+        drivername="postgresql+psycopg",
         username=need("POSTGRES_USER"),
         password=need("POSTGRES_PASSWORD"),
         host=need("POSTGRES_HOST"),
@@ -74,6 +74,26 @@ def session_scope() -> Iterator[Session]:
         raise
     finally:
         session.close()
+
+
+@contextmanager
+def psycopg_connection() -> Iterator[psycopg.Connection]:
+    """Get a direct psycopg connection for multi-vector operations."""
+    conn = psycopg.connect(
+        dbname=need("POSTGRES_DB"),
+        user=need("POSTGRES_USER"),
+        password=need("POSTGRES_PASSWORD"),
+        host=need("POSTGRES_HOST"),
+        port=int(need("POSTGRES_PORT")),
+    )
+    
+    # Register vector types for multi-vector support
+    register_vector(conn)
+    
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 def apply_schemas(dim: int) -> None:

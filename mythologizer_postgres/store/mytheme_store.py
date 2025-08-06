@@ -2,8 +2,6 @@ import numpy as np
 from typing import List, Optional, Tuple, Union, Sequence
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
-import pgvector.psycopg2
-from pgvector import Vector
 
 from mythologizer_postgres.db import get_engine
 
@@ -12,7 +10,7 @@ EngineT = Engine
 
 def get_mythemes_bulk(
     ids: Optional[List[int]] = None,
-    as_numpy: bool = False,
+    as_numpy: bool = True,
 ) -> Tuple[List[int], List[str], Union[List[List[float]], np.ndarray]]:
     """
     Fetch mythemes by id or all of them.
@@ -53,7 +51,7 @@ def get_mythemes_bulk(
 
 def get_mytheme(
     theme_id: int,
-    as_numpy: bool = False,
+    as_numpy: bool = True,
 ) -> Tuple[int, str, Union[List[float], np.ndarray]]:
     """
     Fetch exactly one mytheme by id.
@@ -86,7 +84,7 @@ def insert_mythemes_bulk(
         VALUES (:sentence, :embedding)
     """)
     records = [
-        {"sentence": s, "embedding": Vector(e)}
+        {"sentence": s, "embedding": e}
         for s, e in zip(sentences, embeddings_list)
     ]
 
