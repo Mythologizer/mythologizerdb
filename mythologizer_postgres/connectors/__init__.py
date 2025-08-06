@@ -1,3 +1,4 @@
+# Import all connector functions
 from .mytheme_store import get_mythemes_bulk, get_mytheme, insert_mythemes_bulk
 from .myth_store import (
     insert_myth,
@@ -10,18 +11,21 @@ from .myth_store import (
     delete_myth,
     delete_myths_bulk,
 )
-from .myth_algebra import (
+from .mythicalgebra.mythic_algebra_connector import (
     get_myth_embeddings,
     get_myth_matrices,
     recalc_and_update_myths,
-    validate_myth_matrix,
-    get_myth_matrix_info,
 )
 
+# Import mythicalgebra subpackage
+from . import mythicalgebra
+
 __all__ = [
+    # Mytheme functions
     "get_mythemes_bulk", 
     "get_mytheme", 
     "insert_mythemes_bulk", 
+    # Myth functions
     "insert_myth",
     "insert_myths_bulk",
     "get_myth",
@@ -31,9 +35,10 @@ __all__ = [
     "search_similar_myths",
     "delete_myth",
     "delete_myths_bulk",
+    # Myth algebra functions
     "get_myth_embeddings",
     "get_myth_matrices",
     "recalc_and_update_myths",
-    "validate_myth_matrix",
-    "get_myth_matrix_info",
+    # Subpackages
+    "mythicalgebra",
 ]

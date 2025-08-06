@@ -1,7 +1,8 @@
 [project]
 name = "mythologizer_postgres"
 version = "0.1.0"
-description = "Add your description here"
+description = "PostgreSQL database connector for mythology data with vector embeddings"
+authors = [{ name = "Pierre-Louis Suckrow", email = "suckrowpierre@gmail.com" }]
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -22,11 +23,12 @@ mythologizer_postgres = "mythologizer_postgres.cli:app"
 package = true
 
 [build-system]
-requires = ["hatchling>=1.24"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
-[tool.hatch.build.targets.wheel]
-packages = ["mythologizer_postgres"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mythologizer_postgres*"]
 
-[tool.hatch.build.targets.editable]
-packages = ["mythologizer_postgres"]
+[tool.setuptools.package-data]
+mythologizer_postgres = ["*.sql", "*.yaml", "*.yml"]

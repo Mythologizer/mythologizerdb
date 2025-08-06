@@ -15,8 +15,8 @@ from mythicalgebra import (
     compute_myth_embedding,
 )
 
-from .myth_store import get_myth, get_myths_bulk
-from .mytheme_store import get_mythemes_bulk
+from ..myth_store import get_myth, get_myths_bulk
+from ..mytheme_store import get_mythemes_bulk
 
 
 def get_myth_embeddings(myth_ids: Union[int, List[int]]) -> Union[NDArray[np.floating], List[NDArray[np.floating]]]:
