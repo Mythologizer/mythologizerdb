@@ -7,7 +7,6 @@ from .myth_store import (
     get_myths_bulk,
     update_myth,
     update_myths_bulk,
-    search_similar_myths,
     delete_myth,
     delete_myths_bulk,
 )
@@ -32,7 +31,6 @@ __all__ = [
     "get_myths_bulk",
     "update_myth",
     "update_myths_bulk",
-    "search_similar_myths",
     "delete_myth",
     "delete_myths_bulk",
     # Myth algebra functions

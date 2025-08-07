@@ -153,7 +153,7 @@ def insert_myths_bulk(
             for offsets in offsets_list
         ]
     
-    if len(main_embeddings) != len(embedding_ids_list) != len(offsets_list) != len(weights_list):
+    if len(main_embeddings) != len(embedding_ids_list) or len(main_embeddings) != len(offsets_list) or len(main_embeddings) != len(weights_list):
         raise ValueError("All input lists must have the same length")
     
     myth_ids = []
@@ -458,53 +458,6 @@ def update_myths_bulk(
             conn.commit()
     
     return updated_count
-
-
-def search_similar_myths(
-    query_embedding: Union[np.ndarray, List[float]],
-    limit: int = 10,
-    similarity_threshold: float = 0.5,
-) -> List[Dict]:
-    """
-    Search for myths similar to the query embedding using cosine similarity.
-    
-    Args:
-        query_embedding: Query vector of shape (embedding_dim,) as numpy array or list
-        limit: Maximum number of results to return
-        similarity_threshold: Minimum similarity score (0-1)
-    
-    Returns:
-        List of similar myths with their similarity scores
-    """
-    
-    if isinstance(query_embedding, list):
-        query_embedding = np.array(query_embedding, dtype=np.float32)
-    else:
-        query_embedding = query_embedding.astype(np.float32)
-    
-    with psycopg_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT id, embedding, embedding_ids, offsets, weights,
-                       1 - (embedding <=> %s) as similarity
-                FROM myths
-                WHERE 1 - (embedding <=> %s) > %s
-                ORDER BY embedding <=> %s
-                LIMIT %s;
-            """, (query_embedding, query_embedding, similarity_threshold, query_embedding, limit))
-            
-            myths = []
-            for row in cur.fetchall():
-                myths.append({
-                    "id": row[0],
-                    "embedding": row[1],
-                    "embedding_ids": row[2],
-                    "offsets": row[3],
-                    "weights": row[4],
-                    "similarity": float(row[5])
-                })
-            
-            return myths
 
 
 def delete_myth(myth_id: int) -> bool:

@@ -145,7 +145,7 @@ def recalc_and_update_myths(
         List of updated myth IDs
     """
     
-    from .myth_store import update_myth, update_myths_bulk
+    from ..myth_store import update_myth, update_myths_bulk
     
     if isinstance(myth_data, np.ndarray):
         # Single myth matrix - need myth_ids

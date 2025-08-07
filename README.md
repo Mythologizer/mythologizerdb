@@ -89,7 +89,6 @@ from mythologizer_postgres.connectors import (
     get_myths_bulk,
     update_myth,
     update_myths_bulk,
-    search_similar_myths,
     delete_myth,
     delete_myths_bulk,
     
@@ -101,10 +100,6 @@ from mythologizer_postgres.connectors import (
 
 # Example: Get a myth by ID
 myth = get_myth(123)
-
-# Example: Search for similar myths
-similar_myths = search_similar_myths(myth_id=123, limit=5)
-```
 
 ### Myth Algebra Functions
 

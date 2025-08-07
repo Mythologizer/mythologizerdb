@@ -108,9 +108,24 @@ def apply_schemas(dim: int) -> None:
     ]
 
     try:
+        # First, create the extension without using the engine that has vector registration
+        # This avoids the chicken-and-egg problem
+        init_schema = schema.get_init_schema()
+        
+        # Create a basic engine without vector registration for the initial setup
+        basic_url = build_url()
+        basic_engine = create_engine(basic_url)
+        
+        with basic_engine.begin() as conn:
+            logger.info("Applying init schema")
+            conn.execute(text(init_schema))
+        
+        basic_engine.dispose()
+        
+        # Now use the regular engine with vector registration for the rest
         engine = get_engine()
         with engine.begin() as conn:  # begin() ensures commit or rollback
-            for name, schema_sql in schemas:
+            for name, schema_sql in schemas[1:]:  # Skip init, already done
                 logger.info("Applying schema %s", name)
                 conn.execute(text(schema_sql))
 
@@ -176,7 +191,7 @@ def clear_all_rows() -> None:
     Delete all rows from all user-defined tables in the 'public' schema.
     """
     try:
-        with get_engine().connect() as conn:
+        with get_engine().begin() as conn:
             conn.execute(text("""
                 DO $$
                 DECLARE
