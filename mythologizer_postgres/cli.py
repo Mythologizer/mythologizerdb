@@ -1,3 +1,4 @@
+import os
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -82,12 +83,30 @@ def clear(
 
 @app.command("setup")
 def setup_db(
-    dim: int = typer.Option(384, "--dim", help="Embedding dimensionality (e.g. 384, 768)")
+    dim: Optional[int] = typer.Option(None, "--dim", help="Embedding dimensionality (e.g. 384, 768)")
 ):
     """
     Apply database schema for the given dimensionality.
+    
+    If --dim is not provided, uses EMBEDDING_DIM from .env file.
+    If EMBEDDING_DIM is not set, defaults to 384.
     """
-    apply_schemas(dim)
+    # Get dimension from parameter, environment, or default
+    if dim is not None:
+        embedding_dim = dim
+    else:
+        env_dim = os.getenv('EMBEDDING_DIM')
+        if env_dim:
+            try:
+                embedding_dim = int(env_dim)
+            except ValueError:
+                typer.secho(f"Invalid EMBEDDING_DIM value in .env: {env_dim}. Using default 384.", fg=typer.colors.YELLOW)
+                embedding_dim = 384
+        else:
+            embedding_dim = 384
+    
+    typer.echo(f"Using embedding dimension: {embedding_dim}")
+    apply_schemas(embedding_dim)
     typer.secho("Schemas created", fg=typer.colors.GREEN)
 
 @app.command("destroy")
