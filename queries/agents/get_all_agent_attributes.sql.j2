@@ -1,0 +1,28 @@
+-- Dynamic query to get all agent attributes with their constraints
+-- Excludes: id, name, memory_size
+-- Automatically discovers all other attributes and their constraints
+
+SELECT 
+    c.column_name as attribute_name,
+    c.data_type,
+    CASE 
+        WHEN c.is_nullable = 'YES' THEN 'NULLABLE'
+        ELSE 'NOT NULL'
+    END as nullability,
+    c.column_default,
+    c.character_maximum_length,
+    c.numeric_precision,
+    c.numeric_scale,
+    COALESCE(
+        (SELECT string_agg(pg_get_constraintdef(con.oid), '; ')
+         FROM pg_constraint con
+         WHERE con.conrelid = c.table_name::regclass
+         AND con.contype = 'c'
+         AND pg_get_constraintdef(con.oid) LIKE '%' || c.column_name || '%'
+        ), 
+        'No constraints'
+    ) as constraints
+FROM information_schema.columns c
+WHERE c.table_name = 'agents'
+    AND c.column_name NOT IN ('id', 'name', 'memory_size')
+ORDER BY c.ordinal_position;
