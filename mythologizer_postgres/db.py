@@ -98,35 +98,35 @@ def psycopg_connection() -> Iterator[psycopg.Connection]:
 
 def apply_schemas(dim: int) -> None:
     """
-    Execute the schema definitions in order: init, mytheme, myth.
+    Execute all schema definitions from the schemas folder in order.
     If any execution fails, the error is propagated.
     """
-    schemas = [
-        ("init", schema.get_init_schema()),
-        ("mytheme", schema.get_mytheme_schema(dim)),
-        ("myth", schema.get_myth_schema(dim)),
-    ]
-
     try:
-        # First, create the extension without using the engine that has vector registration
-        # This avoids the chicken-and-egg problem
-        init_schema = schema.get_init_schema()
+        # Get all schemas from the schemas folder
+        schema_sqls = list(schema.get_schemas("schemas", dim=dim))
+        
+        if not schema_sqls:
+            logger.warning("No schema files found in schemas folder")
+            return
         
         # Create a basic engine without vector registration for the initial setup
+        # This avoids the chicken-and-egg problem with pgvector extension
         basic_url = build_url()
         basic_engine = create_engine(basic_url)
         
-        with basic_engine.begin() as conn:
-            logger.info("Applying init schema")
-            conn.execute(text(init_schema))
+        # Apply the first schema (init.sql.j2) with basic engine
+        if schema_sqls:
+            with basic_engine.begin() as conn:
+                logger.info("Applying initial schema")
+                conn.execute(text(schema_sqls[0]))
         
         basic_engine.dispose()
         
         # Now use the regular engine with vector registration for the rest
         engine = get_engine()
         with engine.begin() as conn:  # begin() ensures commit or rollback
-            for name, schema_sql in schemas[1:]:  # Skip init, already done
-                logger.info("Applying schema %s", name)
+            for i, schema_sql in enumerate(schema_sqls[1:], 1):  # Skip first schema, already done
+                logger.info("Applying schema %d of %d", i + 1, len(schema_sqls))
                 conn.execute(text(schema_sql))
 
         logger.info("All schemas applied successfully")

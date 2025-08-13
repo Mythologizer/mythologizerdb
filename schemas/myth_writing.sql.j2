@@ -1,0 +1,6 @@
+CREATE TABLE myth_writings (
+    id SERIAL PRIMARY KEY,
+    myth_id INT NOT NULL REFERENCES myths(id) ON DELETE CASCADE,
+    written_text TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

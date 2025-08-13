@@ -1,0 +1,5 @@
+CREATE TABLE agent_cultures (
+    agent_id INT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    culture_id INT NOT NULL REFERENCES cultures(id) ON DELETE CASCADE,
+    PRIMARY KEY (agent_id, culture_id)
+);

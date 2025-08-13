@@ -1,0 +1,168 @@
+CREATE TABLE agent_myths (
+    myth_id INT PRIMARY KEY REFERENCES myths(id) ON DELETE CASCADE,
+    agent_id INT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    position INT NOT NULL CHECK (position > 0),
+    retention DOUBLE PRECISION NOT NULL CHECK (retention > 0 ),
+    UNIQUE (agent_id, position)
+);
+
+CREATE INDEX agent_myths_agent_pos_idx ON agent_myths (agent_id, position);
+
+-- Push semantics with bottom = 1 and top = highest position
+CREATE OR REPLACE FUNCTION push_agent_myth()
+RETURNS TRIGGER AS $$
+DECLARE
+    max_size INT;
+    cur_count INT;
+    drop_id INT;
+BEGIN
+    -- lock the agent row for consistent capacity reads
+    SELECT memory_size INTO max_size
+    FROM agents
+    WHERE id = NEW.agent_id
+    FOR UPDATE;
+
+    IF max_size IS NULL THEN
+        RAISE EXCEPTION 'Agent % not found', NEW.agent_id;
+    END IF;
+
+    IF max_size = 0 THEN
+        RAISE EXCEPTION 'Agent % has memory_size = 0. Cannot push myths', NEW.agent_id;
+    END IF;
+
+    -- a myth can belong to only one agent
+    IF EXISTS (SELECT 1 FROM agent_myths WHERE myth_id = NEW.myth_id) THEN
+        RAISE EXCEPTION 'Myth % already assigned to an agent', NEW.myth_id;
+    END IF;
+
+    SELECT COUNT(*) INTO cur_count
+    FROM agent_myths
+    WHERE agent_id = NEW.agent_id
+    FOR UPDATE;
+
+    IF cur_count >= max_size THEN
+        -- evict bottom at position 1
+        SELECT myth_id INTO drop_id
+        FROM agent_myths
+        WHERE agent_id = NEW.agent_id
+        ORDER BY position ASC
+        LIMIT 1;
+
+        DELETE FROM agent_myths
+        WHERE myth_id = drop_id;
+
+        -- shift remaining down by 1 so positions stay contiguous
+        UPDATE agent_myths
+        SET position = position - 1
+        WHERE agent_id = NEW.agent_id;
+        
+        -- insert new myth at top
+        NEW.position := max_size;
+        RETURN NEW;
+    ELSE
+        -- not full. new myth goes to top which is current_count + 1
+        NEW.position := cur_count + 1;
+        RETURN NEW;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_push_agent_myth
+BEFORE INSERT ON agent_myths
+FOR EACH ROW
+EXECUTE FUNCTION push_agent_myth();
+
+-- Reorder keeps positions contiguous with bottom = 1 and top = highest position
+CREATE OR REPLACE FUNCTION reorder_agent_myth(p_agent_id INT, p_myth_id INT, p_new_pos INT)
+RETURNS VOID AS $$
+DECLARE
+    old_pos INT;
+    max_pos INT;
+BEGIN
+    IF p_new_pos < 1 THEN
+        RAISE EXCEPTION 'Position must be >= 1';
+    END IF;
+
+    -- lock the target row and get current position
+    SELECT position INTO old_pos
+    FROM agent_myths
+    WHERE myth_id = p_myth_id AND agent_id = p_agent_id
+    FOR UPDATE;
+
+    IF old_pos IS NULL THEN
+        RAISE EXCEPTION 'Myth % not in agent % memory', p_myth_id, p_agent_id;
+    END IF;
+
+    -- lock all rows for this agent to ensure consistent shifting
+    SELECT COALESCE(MAX(position), 0) INTO max_pos
+    FROM agent_myths
+    WHERE agent_id = p_agent_id
+    FOR UPDATE;
+
+    IF p_new_pos > max_pos THEN
+        p_new_pos := max_pos;
+    END IF;
+
+    IF p_new_pos = old_pos THEN
+        RETURN;
+    END IF;
+
+    IF p_new_pos < old_pos THEN
+        -- moving toward bottom expands interval [p_new_pos, old_pos - 1] upward
+        UPDATE agent_myths
+        SET position = position + 1
+        WHERE agent_id = p_agent_id
+          AND position >= p_new_pos
+          AND position < old_pos;
+    ELSE
+        -- moving toward top shrinks interval [old_pos + 1, p_new_pos] downward
+        UPDATE agent_myths
+        SET position = position - 1
+        WHERE agent_id = p_agent_id
+          AND position <= p_new_pos
+          AND position > old_pos;
+    END IF;
+
+    UPDATE agent_myths
+    SET position = p_new_pos
+    WHERE myth_id = p_myth_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trim on memory_size change. Drops from bottom and keeps top
+CREATE OR REPLACE FUNCTION trim_agent_memory()
+RETURNS TRIGGER AS $$
+DECLARE
+    keep INT;
+BEGIN
+    IF NEW.memory_size < 0 THEN
+        RAISE EXCEPTION 'memory_size must be >= 0';
+    END IF;
+
+    keep := NEW.memory_size;
+
+    IF keep = 0 THEN
+        DELETE FROM agent_myths WHERE agent_id = NEW.id;
+        RETURN NEW;
+    END IF;
+
+    -- keep highest positions first. delete the rest which are the bottom entries
+    DELETE FROM agent_myths am
+    USING (
+        SELECT myth_id
+        FROM agent_myths
+        WHERE agent_id = NEW.id
+        ORDER BY position DESC
+        OFFSET GREATEST(keep, 0)
+    ) to_drop
+    WHERE am.myth_id = to_drop.myth_id;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_trim_agent_memory
+AFTER UPDATE OF memory_size ON agents
+FOR EACH ROW
+WHEN (NEW.memory_size IS DISTINCT FROM OLD.memory_size)
+EXECUTE FUNCTION trim_agent_memory();
