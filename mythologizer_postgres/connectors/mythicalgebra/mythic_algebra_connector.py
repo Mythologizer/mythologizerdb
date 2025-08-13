@@ -41,7 +41,7 @@ def get_myth_embeddings(myth_ids: Union[int, List[int]]) -> Union[NDArray[np.flo
         if not myth_ids:
             return []
         
-        ids, main_embeddings, _, _, _ = get_myths_bulk(myth_ids)
+        ids, main_embeddings, _, _, _, _, _ = get_myths_bulk(myth_ids)
         if len(ids) != len(myth_ids):
             missing_ids = set(myth_ids) - set(ids)
             raise ValueError(f"Myths not found: {missing_ids}")
@@ -92,7 +92,7 @@ def get_myth_matrices(myth_ids: Union[int, List[int]]) -> Union[NDArray[np.float
             return []
         
         # Get all myths
-        ids, main_embeddings, embedding_ids_list, offsets_list, weights_list = get_myths_bulk(myth_ids)
+        ids, main_embeddings, embedding_ids_list, offsets_list, weights_list, created_ats, updated_ats = get_myths_bulk(myth_ids)
         if len(ids) != len(myth_ids):
             missing_ids = set(myth_ids) - set(ids)
             raise ValueError(f"Myths not found: {missing_ids}")

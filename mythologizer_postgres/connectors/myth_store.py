@@ -191,7 +191,7 @@ def get_myth(myth_id: int) -> Optional[Dict]:
     with psycopg_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, embedding, embedding_ids, offsets, weights
+                SELECT id, embedding, embedding_ids, offsets, weights, created_at, updated_at
                 FROM myths
                 WHERE id = %s;
             """, (myth_id,))
@@ -203,7 +203,9 @@ def get_myth(myth_id: int) -> Optional[Dict]:
                     "embedding": row[1],
                     "embedding_ids": row[2],
                     "offsets": row[3],
-                    "weights": row[4]
+                    "weights": row[4],
+                    "created_at": row[5],
+                    "updated_at": row[6]
                 }
             return None
 
@@ -211,7 +213,7 @@ def get_myth(myth_id: int) -> Optional[Dict]:
 def get_myths_bulk(
     myth_ids: Optional[List[int]] = None,
     as_numpy: bool = True,
-) -> Tuple[List[int], List[np.ndarray], List[List[int]], List[List[np.ndarray]], List[List[float]]]:
+) -> Tuple[List[int], List[np.ndarray], List[List[int]], List[List[np.ndarray]], List[List[float]], List, List]:
     """
     Fetch myths by ID or all of them.
     
@@ -220,7 +222,7 @@ def get_myths_bulk(
         as_numpy: Whether to return embeddings as numpy arrays
     
     Returns:
-        Tuple of (ids, main_embeddings, embedding_ids_list, offsets_list, weights_list)
+        Tuple of (ids, main_embeddings, embedding_ids_list, offsets_list, weights_list, created_ats, updated_ats)
     """
     
     with psycopg_connection() as conn:
@@ -228,14 +230,14 @@ def get_myths_bulk(
             if myth_ids:
                 placeholders = ", ".join(["%s"] * len(myth_ids))
                 cur.execute(f"""
-                    SELECT id, embedding, embedding_ids, offsets, weights
+                    SELECT id, embedding, embedding_ids, offsets, weights, created_at, updated_at
                     FROM myths
                     WHERE id IN ({placeholders})
                     ORDER BY id;
                 """, myth_ids)
             else:
                 cur.execute("""
-                    SELECT id, embedding, embedding_ids, offsets, weights
+                    SELECT id, embedding, embedding_ids, offsets, weights, created_at, updated_at
                     FROM myths
                     ORDER BY id;
                 """)
@@ -243,15 +245,15 @@ def get_myths_bulk(
             rows = cur.fetchall()
     
     if not rows:
-        return [], [], [], [], []
+        return [], [], [], [], [], [], []
     
-    ids, main_embeddings, embedding_ids_list, offsets_list, weights_list = zip(*rows)
+    ids, main_embeddings, embedding_ids_list, offsets_list, weights_list, created_ats, updated_ats = zip(*rows)
     
     if as_numpy:
         main_embeddings = [np.array(emb, dtype=np.float32) for emb in main_embeddings]
         offsets_list = [[np.array(offset, dtype=np.float32) for offset in offsets] for offsets in offsets_list]
     
-    return list(ids), list(main_embeddings), list(embedding_ids_list), list(offsets_list), list(weights_list)
+    return list(ids), list(main_embeddings), list(embedding_ids_list), list(offsets_list), list(weights_list), list(created_ats), list(updated_ats)
 
 
 def update_myth(

@@ -39,6 +39,14 @@ wait:
 test_setup:
 	$(UV) pytest tests
 
+.PHONY: benchmark
+benchmark: fresh
+	$(UV) python mythologizer_postgres/benchmark.py
+
+.PHONY: benchmark-quick
+benchmark-quick:
+	$(UV) python mythologizer_postgres/benchmark.py
+
 .PHONY: test
 test: fresh test_setup
 	$(COMPOSE) down -v --remove-orphans
