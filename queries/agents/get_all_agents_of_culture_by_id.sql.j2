@@ -1,0 +1,4 @@
+SELECT a.* 
+FROM agents a
+JOIN agent_cultures ac ON a.id = ac.agent_id
+WHERE ac.culture_id = {{ culture_id }};
