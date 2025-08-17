@@ -1,0 +1,31 @@
+-- Get All Agents of Culture by ID Query
+-- Retrieves all agents that belong to a specific culture
+-- 
+-- Purpose: Find all agents associated with a particular culture
+-- 
+-- Parameters:
+--   {{ culture_id }} - The ID of the culture to filter by (Jinja2 template variable)
+--
+-- Returns: All agent records that are associated with the specified culture
+-- 
+-- Columns returned:
+--   - All columns from the agents table (id, name, age, memory_size)
+--
+-- Joins:
+--   - agents (a) - Main agent table
+--   - agent_cultures (ac) - Junction table linking agents to cultures
+--
+-- Example usage:
+--   SELECT a.* 
+--   FROM agents a
+--   JOIN agent_cultures ac ON a.id = ac.agent_id
+--   WHERE ac.culture_id = 1;
+--
+-- Note: This query uses a JOIN to find agents through the agent_cultures
+-- junction table. Only agents that have been explicitly associated with
+-- the specified culture will be returned.
+
+SELECT a.* 
+FROM agents a
+JOIN agent_cultures ac ON a.id = ac.agent_id
+WHERE ac.culture_id = {{ culture_id }};

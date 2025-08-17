@@ -1,0 +1,66 @@
+-- Get All Agent Attributes Query
+-- Dynamic query to retrieve comprehensive metadata about agent table attributes
+-- 
+-- Purpose: Discover all agent table columns (excluding id, name, memory_size) along with
+-- their data types, constraints, and metadata for dynamic schema analysis
+-- 
+-- Returns: Detailed information about each attribute in the agents table
+-- 
+-- Columns returned:
+--   - attribute_name: Name of the column/attribute
+--   - data_type: SQL data type of the column
+--   - nullability: Whether the column allows NULL values
+--   - column_default: Default value if specified
+--   - character_maximum_length: Max length for character types
+--   - numeric_precision: Precision for numeric types
+--   - numeric_scale: Scale for numeric types
+--   - constraints: All constraints applied to the column
+--
+-- Exclusions:
+--   - id: Primary key column
+--   - name: Basic name column
+--   - memory_size: Memory capacity column
+--
+-- Tables accessed:
+--   - information_schema.columns: System catalog for column metadata
+--   - pg_constraint: PostgreSQL constraint definitions
+--
+-- Example usage:
+--   This query is typically used for:
+--   - Dynamic form generation
+--   - Schema validation
+--   - Constraint analysis
+--   - Documentation generation
+--
+-- Note: This is a metadata query that provides comprehensive information
+-- about the agents table structure. It's useful for building dynamic
+-- applications that need to understand the schema at runtime.
+
+-- Dynamic query to get all agent attributes with their constraints
+-- Excludes: id, name, memory_size
+-- Automatically discovers all other attributes and their constraints
+
+SELECT 
+    c.column_name as attribute_name,
+    c.data_type,
+    CASE 
+        WHEN c.is_nullable = 'YES' THEN 'NULLABLE'
+        ELSE 'NOT NULL'
+    END as nullability,
+    c.column_default,
+    c.character_maximum_length,
+    c.numeric_precision,
+    c.numeric_scale,
+    COALESCE(
+        (SELECT string_agg(pg_get_constraintdef(con.oid), '; ')
+         FROM pg_constraint con
+         WHERE con.conrelid = c.table_name::regclass
+         AND con.contype = 'c'
+         AND pg_get_constraintdef(con.oid) LIKE '%' || c.column_name || '%'
+        ), 
+        'No constraints'
+    ) as constraints
+FROM information_schema.columns c
+WHERE c.table_name = 'agents'
+    AND c.column_name NOT IN ('id', 'name', 'memory_size')
+ORDER BY c.ordinal_position;

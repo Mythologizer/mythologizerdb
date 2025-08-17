@@ -1,0 +1,59 @@
+-- Get Agent Myths Query
+-- Retrieves all myths associated with a specific agent
+-- 
+-- Purpose: Find all myths that have been assigned to a particular agent
+-- 
+-- Parameters:
+--   {{ agent_id }} - The ID of the agent to filter by (Jinja2 template variable)
+--
+-- Returns: All myths associated with the specified agent
+-- 
+-- Columns returned:
+--   - myth_id: ID of the myth
+--   - agent_id: ID of the agent
+--   - position: Position of the myth in the agent's memory (1 = bottom, highest = top)
+--   - retention: Retention value for the myth (double precision)
+--   - myth_embedding: Vector representation of the myth
+--   - myth_embedding_ids: Array of integer IDs associated with the myth
+--   - myth_offsets: Array of vector offsets for the myth
+--   - myth_weights: Array of double precision weights for the myth
+--   - myth_created_at: When the myth was created
+--   - myth_updated_at: When the myth was last updated
+--
+-- Joins:
+--   - agent_myths: Junction table linking agents to myths
+--   - myths: Core myth data and embeddings
+--
+-- Ordering: Results are ordered by position (memory stack order)
+--
+-- Example usage:
+--   SELECT am.myth_id, am.agent_id, am.position, am.retention,
+--          m.embedding as myth_embedding, m.embedding_ids as myth_embedding_ids,
+--          m.offsets as myth_offsets, m.weights as myth_weights,
+--          m.created_at as myth_created_at, m.updated_at as myth_updated_at
+--   FROM agent_myths am
+--   JOIN myths m ON am.myth_id = m.id
+--   WHERE am.agent_id = 1
+--   ORDER BY am.position;
+--
+-- Note: This query follows the stack-like memory model where myths
+-- are positioned in the agent's memory. Position 1 is the bottom
+-- (oldest/least important) and higher positions are the top
+-- (newest/most important). Useful for understanding an agent's
+-- current knowledge state and memory organization.
+
+SELECT 
+    am.myth_id, 
+    am.agent_id, 
+    am.position, 
+    am.retention,
+    m.embedding as myth_embedding, 
+    m.embedding_ids as myth_embedding_ids,
+    m.offsets as myth_offsets, 
+    m.weights as myth_weights,
+    m.created_at as myth_created_at, 
+    m.updated_at as myth_updated_at
+FROM agent_myths am
+JOIN myths m ON am.myth_id = m.id
+WHERE am.agent_id = {{ agent_id }}
+ORDER BY am.position;

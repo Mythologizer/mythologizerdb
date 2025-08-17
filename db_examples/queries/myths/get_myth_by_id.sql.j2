@@ -1,0 +1,31 @@
+-- Get Myth by ID Query
+-- Retrieves a single myth by its unique identifier
+-- 
+-- Purpose: Fetch a specific myth record using its primary key
+-- 
+-- Parameters:
+--   {{ myth_id }} - The ID of the myth to retrieve (Jinja2 template variable)
+--
+-- Returns: Complete myth record if found
+-- 
+-- Columns returned:
+--   - id: Unique identifier for the myth
+--   - embedding: Vector representation of the myth (VECTOR type)
+--   - embedding_ids: Array of integer IDs associated with the myth
+--   - offsets: Array of vector offsets for the myth
+--   - weights: Array of double precision weights for the myth
+--   - created_at: Timestamp when the myth was created
+--   - updated_at: Timestamp when the myth was last updated
+--
+-- Example usage:
+--   SELECT id, embedding, embedding_ids, offsets, weights, created_at, updated_at
+--   FROM myths
+--   WHERE id = 1;
+--
+-- Note: This query is useful for retrieving specific myths for processing,
+-- analysis, or display purposes. The embedding and related vector data
+-- can be used for similarity calculations and AI processing.
+
+SELECT id, embedding, embedding_ids, offsets, weights, created_at, updated_at
+FROM myths
+WHERE id = {{ myth_id }};

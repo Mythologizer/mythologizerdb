@@ -1,0 +1,63 @@
+-- Get All Myth Writings That Have Been Read With Agent Names and Cultures Query
+-- Retrieves myth writings that have been marked as read, along with the names
+-- of agents who have processed them and all cultures associated with each agent
+-- 
+-- Purpose: Find all myth writings that have been consumed/processed by agents,
+-- identify which agents have read each writing, and show all cultures
+-- that each agent belongs to
+-- 
+-- Returns: Myth writings that have been read, with associated agent information
+-- and agent cultures
+-- 
+-- Columns returned:
+--   - agents.name: Name of the agent who has read the myth writing
+--   - myth_writings.written_text: The actual text content of the myth writing
+--   - myth_writings.created_at: Timestamp when the myth writing was created
+--   - agent_cultures: Array of all culture names that the agent belongs to
+--
+-- Tables joined:
+--   - myth_writings: Contains the written content and read status
+--   - myths: Links myth writings to the core myth
+--   - agent_myths: Junction table showing which agents have which myths
+--   - agents: Provides agent names and details
+--   - agent_cultures: Junction table linking agents to cultures
+--   - cultures: Provides culture names and descriptions
+--
+-- Filtering:
+--   - Only returns myth writings where has_been_read = TRUE
+--
+-- Example usage:
+--   SELECT 
+--       agents.name,
+--       myth_writings.written_text,
+--       myth_writings.created_at,
+--       ARRAY_AGG(cultures.name) as agent_cultures
+--   FROM myth_writings
+--   JOIN myths ON myths.id = myth_writings.myth_id
+--   JOIN agent_myths ON myths.id = agent_myths.myth_id
+--   JOIN agents ON agent_myths.agent_id = agents.id
+--   LEFT JOIN agent_cultures ON agents.id = agent_cultures.agent_id
+--   LEFT JOIN cultures ON agent_cultures.culture_id = cultures.id
+--   WHERE myth_writings.has_been_read = TRUE
+--   GROUP BY agents.name, myth_writings.written_text, myth_writings.created_at;
+--
+-- Note: This query follows the relationship chain from myth writings
+-- through myths to agents, and then to cultures. It shows which agents
+-- have processed which myth writings and what cultural backgrounds
+-- each agent has. The LEFT JOINs ensure that agents without cultures
+-- are still included (with NULL culture arrays). Useful for tracking
+-- agent engagement with myth content across different cultural contexts.
+
+SELECT 
+    agents.name,
+    myth_writings.written_text,
+    myth_writings.created_at,
+    ARRAY_AGG(cultures.name) FILTER (WHERE cultures.name IS NOT NULL) as agent_cultures
+FROM myth_writings
+JOIN myths ON myths.id = myth_writings.myth_id
+JOIN agent_myths ON myths.id = agent_myths.myth_id
+JOIN agents ON agent_myths.agent_id = agents.id
+LEFT JOIN agent_cultures ON agents.id = agent_cultures.agent_id
+LEFT JOIN cultures ON agent_cultures.culture_id = cultures.id
+WHERE myth_writings.has_been_read = TRUE
+GROUP BY agents.name, myth_writings.written_text, myth_writings.created_at;

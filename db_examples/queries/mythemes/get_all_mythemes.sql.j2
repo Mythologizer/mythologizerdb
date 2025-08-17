@@ -1,0 +1,26 @@
+-- Get All Mythemes Query
+-- Retrieves all mythemes from the mythemes table
+-- 
+-- Purpose: Fetch all mytheme records for analysis, processing, or display
+-- 
+-- Returns: All mytheme records in the database
+-- 
+-- Columns returned:
+--   - id: Unique identifier for each mytheme
+--   - sentence: The text content of the mytheme
+--   - embedding: Vector representation of the mytheme (VECTOR type)
+--
+-- Ordering: Results are ordered by ID for consistent retrieval
+--
+-- Example usage:
+--   SELECT id, sentence, embedding FROM mythemes ORDER BY id;
+--
+-- Note: Mythemes are thematic elements extracted from myths, represented
+-- as sentences with their corresponding vector embeddings. This query
+-- is useful for bulk processing of mythemes, similarity analysis,
+-- and building thematic databases. The embedding vectors can be used
+-- for AI-powered thematic analysis and pattern recognition.
+
+SELECT id, sentence, embedding 
+FROM mythemes 
+ORDER BY id;

@@ -1,0 +1,25 @@
+-- Get All Cultures Query
+-- Retrieves all cultures from the cultures table
+-- 
+-- Purpose: Fetch all culture records for display, selection, or analysis
+-- 
+-- Returns: All culture records in the database
+-- 
+-- Columns returned:
+--   - id: Unique identifier for each culture
+--   - name: Name of the culture
+--   - description: Description of the culture
+--
+-- Ordering: Results are ordered by name for consistent retrieval
+--
+-- Example usage:
+--   SELECT id, name, description FROM cultures ORDER BY name;
+--
+-- Note: This query returns all cultures and is useful for building
+-- culture selection interfaces, generating reports, or performing
+-- cultural analysis. Consider using more specific queries for
+-- production use cases with large numbers of cultures.
+
+SELECT id, name, description 
+FROM cultures 
+ORDER BY name;

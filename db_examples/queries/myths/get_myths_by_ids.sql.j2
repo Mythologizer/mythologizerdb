@@ -1,0 +1,37 @@
+-- Get Myths by IDs Query
+-- Retrieves multiple myths by their IDs using an IN clause
+-- 
+-- Purpose: Fetch specific myth records using a list of primary keys
+-- 
+-- Parameters:
+--   {{ myth_ids }} - Array of myth IDs to retrieve (Jinja2 template variable)
+--
+-- Returns: Myth records matching the provided IDs
+-- 
+-- Columns returned:
+--   - id: Unique identifier for each myth
+--   - embedding: Vector representation of each myth (VECTOR type)
+--   - embedding_ids: Array of integer IDs associated with each myth
+--   - offsets: Array of vector offsets for each myth
+--   - weights: Array of double precision weights for each myth
+--   - created_at: Timestamp when each myth was created
+--   - updated_at: Timestamp when each myth was last updated
+--
+-- Ordering: Results are ordered by ID for consistent retrieval
+--
+-- Example usage:
+--   SELECT id, embedding, embedding_ids, offsets, weights, created_at, updated_at
+--   FROM myths
+--   WHERE id IN (1, 2, 3)
+--   ORDER BY id;
+--
+-- Note: This query is useful for retrieving specific subsets of myths
+-- for batch processing, analysis, or when you have a known set of
+-- myth IDs. The IN clause provides efficient retrieval of multiple
+-- records. Consider the size of the myth_ids array to avoid overly
+-- large queries.
+
+SELECT id, embedding, embedding_ids, offsets, weights, created_at, updated_at
+FROM myths
+WHERE id IN ({{ myth_ids | join(', ') }})
+ORDER BY id;

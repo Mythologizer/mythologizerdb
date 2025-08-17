@@ -1,0 +1,16 @@
+-- Insert Culture Mutation
+-- Inserts a new culture into the cultures table
+-- 
+-- Parameters:
+--   :name - Culture name (TEXT, required)
+--   :description - Culture description (TEXT, required)
+--
+-- Returns: The newly created culture's ID
+--
+-- Example usage:
+--   INSERT INTO cultures (name, description) 
+--   VALUES ('Greek Mythology', 'Ancient Greek myths and legends');
+
+INSERT INTO cultures (name, description) 
+VALUES (:name, :description)
+RETURNING id;

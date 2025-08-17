@@ -1,0 +1,32 @@
+-- Get All Myths Query
+-- Retrieves all myths from the myths table
+-- 
+-- Purpose: Fetch all myth records for bulk processing or analysis
+-- 
+-- Returns: All myth records in the database
+-- 
+-- Columns returned:
+--   - id: Unique identifier for each myth
+--   - embedding: Vector representation of each myth (VECTOR type)
+--   - embedding_ids: Array of integer IDs associated with each myth
+--   - offsets: Array of vector offsets for each myth
+--   - weights: Array of double precision weights for each myth
+--   - created_at: Timestamp when each myth was created
+--   - updated_at: Timestamp when each myth was last updated
+--
+-- Ordering: Results are ordered by ID for consistent retrieval
+--
+-- Example usage:
+--   SELECT id, embedding, embedding_ids, offsets, weights, created_at, updated_at
+--   FROM myths
+--   ORDER BY id;
+--
+-- Note: This query returns all myths and should be used carefully
+-- in production environments with large datasets. Consider using
+-- pagination or filtering for better performance with large myth collections.
+-- Useful for bulk operations like embedding analysis, data migration,
+-- or comprehensive myth cataloging.
+
+SELECT id, embedding, embedding_ids, offsets, weights, created_at, updated_at
+FROM myths
+ORDER BY id;
