@@ -177,11 +177,10 @@ class TestAgentCulturesSchema:
             
             # Insert an agent
             session.execute(text("""
-                INSERT INTO agents (name, age, memory_size) 
-                VALUES (:name, :age, :memory_size)
+                INSERT INTO agents (name, memory_size) 
+                VALUES (:name, :memory_size)
             """), {
                 'name': 'Test Agent',
-                'age': 25,
                 'memory_size': 5
             })
             
@@ -283,11 +282,10 @@ class TestAgentCulturesSchema:
             
             # Insert an agent
             session.execute(text("""
-                INSERT INTO agents (name, age, memory_size) 
-                VALUES (:name, :age, :memory_size)
+                INSERT INTO agents (name, memory_size) 
+                VALUES (:name, :memory_size)
             """), {
                 'name': 'Test Agent',
-                'age': 25,
                 'memory_size': 5
             })
             
@@ -347,11 +345,10 @@ class TestAgentCulturesSchema:
             
             # Insert an agent
             session.execute(text("""
-                INSERT INTO agents (name, age, memory_size) 
-                VALUES (:name, :age, :memory_size)
+                INSERT INTO agents (name, memory_size) 
+                VALUES (:name, :memory_size)
             """), {
                 'name': 'Test Agent',
-                'age': 25,
                 'memory_size': 5
             })
             
@@ -397,11 +394,10 @@ class TestAgentCulturesSchema:
             
             # Re-insert for culture deletion test
             session.execute(text("""
-                INSERT INTO agents (name, age, memory_size) 
-                VALUES (:name, :age, :memory_size)
+                INSERT INTO agents (name, memory_size) 
+                VALUES (:name, :memory_size)
             """), {
                 'name': 'Test Agent 2',
-                'age': 30,
                 'memory_size': 10
             })
             

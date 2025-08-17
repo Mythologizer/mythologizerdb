@@ -1,6 +1,5 @@
 CREATE TABLE agents (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
-    age INT NOT NULL CHECK (age > 1),
     memory_size INT NOT NULL CHECK (memory_size >= 3)
 );

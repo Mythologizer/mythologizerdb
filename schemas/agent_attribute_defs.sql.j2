@@ -1,0 +1,12 @@
+CREATE TYPE attr_type AS ENUM ('int', 'float');
+
+CREATE TABLE agent_attribute_defs (
+  id   SERIAL PRIMARY KEY,
+  name          TEXT NOT NULL UNIQUE,
+  description   TEXT,
+  atype         attr_type NOT NULL,
+  min_val       NUMERIC,
+  max_val       NUMERIC,
+  col_idx       INT NOT NULL UNIQUE,   -- stable column position
+  CHECK (min_val IS NULL OR max_val IS NULL OR min_val <= max_val)
+);

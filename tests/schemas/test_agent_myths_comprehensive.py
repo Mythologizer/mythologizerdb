@@ -60,11 +60,10 @@ class TestAgentMythsComprehensive:
             
             # Insert an agent with memory_size = 5
             session.execute(text("""
-                INSERT INTO agents (name, age, memory_size) 
-                VALUES (:name, :age, :memory_size)
+                INSERT INTO agents (name, memory_size) 
+                VALUES (:name, :memory_size)
             """), {
                 'name': 'Test Agent',
-                'age': 25,
                 'memory_size': 5
             })
             
@@ -107,11 +106,10 @@ class TestAgentMythsComprehensive:
             
             # Insert an agent with memory_size = 3
             session.execute(text("""
-                INSERT INTO agents (name, age, memory_size) 
-                VALUES (:name, :age, :memory_size)
+                INSERT INTO agents (name, memory_size) 
+                VALUES (:name, :memory_size)
             """), {
                 'name': 'Test Agent',
-                'age': 25,
                 'memory_size': 3
             })
             
@@ -239,20 +237,18 @@ class TestAgentMythsComprehensive:
             
             # Insert two agents
             session.execute(text("""
-                INSERT INTO agents (name, age, memory_size) 
-                VALUES (:name, :age, :memory_size)
+                INSERT INTO agents (name, memory_size) 
+                VALUES (:name, :memory_size)
             """), {
                 'name': 'Agent 1',
-                'age': 25,
                 'memory_size': 5
             })
             
             session.execute(text("""
-                INSERT INTO agents (name, age, memory_size) 
-                VALUES (:name, :age, :memory_size)
+                INSERT INTO agents (name, memory_size) 
+                VALUES (:name, :memory_size)
             """), {
                 'name': 'Agent 2',
-                'age': 30,
                 'memory_size': 5
             })
             
@@ -300,11 +296,10 @@ class TestAgentMythsComprehensive:
             
             # Insert an agent with memory_size = 5
             session.execute(text("""
-                INSERT INTO agents (name, age, memory_size) 
-                VALUES (:name, :age, :memory_size)
+                INSERT INTO agents (name, memory_size) 
+                VALUES (:name, :memory_size)
             """), {
                 'name': 'Test Agent',
-                'age': 25,
                 'memory_size': 5
             })
             
@@ -413,11 +408,10 @@ class TestAgentMythsComprehensive:
             
             # Insert an agent
             session.execute(text("""
-                INSERT INTO agents (name, age, memory_size) 
-                VALUES (:name, :age, :memory_size)
+                INSERT INTO agents (name, memory_size) 
+                VALUES (:name, :memory_size)
             """), {
                 'name': 'Test Agent',
-                'age': 25,
                 'memory_size': 5
             })
             

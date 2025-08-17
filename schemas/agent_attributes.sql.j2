@@ -1,0 +1,4 @@
+CREATE TABLE agent_attributes (
+  agent_id          INT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,
+  attribute_values  DOUBLE PRECISION[] NOT NULL
+);

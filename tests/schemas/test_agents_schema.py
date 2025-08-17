@@ -34,7 +34,6 @@ class TestAgentsSchema:
             expected_agents_columns = {
                 'id': 'integer',
                 'name': 'text',
-                'age': 'integer',
                 'memory_size': 'integer'
             }
             
@@ -48,42 +47,28 @@ class TestAgentsSchema:
         with session_scope() as session:
             # Test valid insertions
             session.execute(text("""
-                INSERT INTO agents (name, age, memory_size) 
-                VALUES (:name, :age, :memory_size)
+                INSERT INTO agents (name, memory_size) 
+                VALUES (:name, :memory_size)
             """), {
                 'name': 'Test Agent 1',
-                'age': 25,
                 'memory_size': 10
             })
             
             session.execute(text("""
-                INSERT INTO agents (name, age, memory_size) 
-                VALUES (:name, :age, :memory_size)
+                INSERT INTO agents (name, memory_size) 
+                VALUES (:name, :memory_size)
             """), {
                 'name': 'Test Agent 2',
-                'age': 30,
                 'memory_size': 5
             })
-            
-            # Test age constraint (must be > 1)
-            with pytest.raises(Exception):
-                session.execute(text("""
-                    INSERT INTO agents (name, age, memory_size) 
-                    VALUES (:name, :age, :memory_size)
-                """), {
-                    'name': 'Invalid Age Agent',
-                    'age': 1,  # Should fail
-                    'memory_size': 10
-                })
             
             # Test memory_size constraint (must be >= 3)
             with pytest.raises(Exception):
                 session.execute(text("""
-                    INSERT INTO agents (name, age, memory_size) 
-                    VALUES (:name, :age, :memory_size)
+                    INSERT INTO agents (name, memory_size) 
+                    VALUES (:name, :memory_size)
                 """), {
                     'name': 'Invalid Memory Agent',
-                    'age': 25,
                     'memory_size': 2  # Should fail
                 })
         
@@ -96,25 +81,23 @@ class TestAgentsSchema:
         with session_scope() as session:
             # Insert agents
             session.execute(text("""
-                INSERT INTO agents (name, age, memory_size) 
-                VALUES (:name, :age, :memory_size)
+                INSERT INTO agents (name, memory_size) 
+                VALUES (:name, :memory_size)
             """), {
                 'name': 'Agent Alpha',
-                'age': 25,
                 'memory_size': 10
             })
             
             session.execute(text("""
-                INSERT INTO agents (name, age, memory_size) 
-                VALUES (:name, :age, :memory_size)
+                INSERT INTO agents (name, memory_size) 
+                VALUES (:name, :memory_size)
             """), {
                 'name': 'Agent Beta',
-                'age': 30,
                 'memory_size': 15
             })
             
             # Query agents
-            result = session.execute(text("SELECT id, name, age, memory_size FROM agents ORDER BY name"))
+            result = session.execute(text("SELECT id, name, memory_size FROM agents ORDER BY name"))
             agents = result.fetchall()
             
             assert len(agents) == 2, "Should have 2 agents"
@@ -187,11 +170,10 @@ class TestAgentMythsSchema:
             
             # Insert an agent
             session.execute(text("""
-                INSERT INTO agents (name, age, memory_size) 
-                VALUES (:name, :age, :memory_size)
+                INSERT INTO agents (name, memory_size) 
+                VALUES (:name, :memory_size)
             """), {
                 'name': 'Test Agent',
-                'age': 25,
                 'memory_size': 5
             })
             
@@ -251,11 +233,10 @@ class TestAgentMythsSchema:
             
             # Insert an agent
             session.execute(text("""
-                INSERT INTO agents (name, age, memory_size) 
-                VALUES (:name, :age, :memory_size)
+                INSERT INTO agents (name, memory_size) 
+                VALUES (:name, :memory_size)
             """), {
                 'name': 'Test Agent',
-                'age': 25,
                 'memory_size': 5
             })
             
@@ -338,11 +319,10 @@ class TestAgentMythsSchema:
             
             # Insert an agent
             session.execute(text("""
-                INSERT INTO agents (name, age, memory_size) 
-                VALUES (:name, :age, :memory_size)
+                INSERT INTO agents (name, memory_size) 
+                VALUES (:name, :memory_size)
             """), {
                 'name': 'Test Agent',
-                'age': 25,
                 'memory_size': 5
             })
             
