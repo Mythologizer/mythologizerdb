@@ -17,6 +17,7 @@ from mythologizer_postgres.db import (
     ping_db,
     get_table_row_counts,
     clear_all_rows,
+    is_correct_embedding_size,
     MissingEnvironmentVariable,
 )
 
@@ -225,5 +226,104 @@ class TestDatabaseOperations:
         call_args = mock_conn.execute.call_args[0][0]
         assert "DELETE FROM" in str(call_args)
 
+    @pytest.mark.unit
+    @patch('mythologizer_postgres.db.get_engine')
+    def test_is_correct_embedding_size_success(self, mock_get_engine):
+        """Test is_correct_embedding_size function with correct dimensions."""
+        # Get the expected embedding dimension from environment
+        expected_dim = int(os.getenv('EMBEDDING_DIM', '4'))
+        
+        mock_engine = MagicMock()
+        mock_get_engine.return_value = mock_engine
+        mock_conn = MagicMock()
+        mock_engine.connect.return_value.__enter__.return_value = mock_conn
+        
+        # Mock the query result for the expected vector dimensions
+        mock_result = MagicMock()
+        mock_result.fetchall.return_value = [(f'vector({expected_dim})',), (f'vector({expected_dim})',)]
+        mock_conn.execute.return_value = mock_result
+        
+        result = is_correct_embedding_size(expected_dim)
+        assert result is True
+        
+        # Verify the query was executed
+        mock_conn.execute.assert_called_once()
+        call_args = mock_conn.execute.call_args[0][0]
+        assert "format_type" in str(call_args)
+        assert "myths" in str(call_args)
+        assert "mythemes" in str(call_args)
 
-# Integration tests moved to test_db_integration.py 
+    @pytest.mark.unit
+    @patch('mythologizer_postgres.db.get_engine')
+    def test_is_correct_embedding_size_mismatch(self, mock_get_engine):
+        """Test is_correct_embedding_size function with dimension mismatch."""
+        # Get the expected embedding dimension from environment
+        expected_dim = int(os.getenv('EMBEDDING_DIM', '4'))
+        wrong_dim = expected_dim + 1
+        
+        mock_engine = MagicMock()
+        mock_get_engine.return_value = mock_engine
+        mock_conn = MagicMock()
+        mock_engine.connect.return_value.__enter__.return_value = mock_conn
+        
+        # Mock the query result for the wrong vector dimensions
+        mock_result = MagicMock()
+        mock_result.fetchall.return_value = [(f'vector({wrong_dim})',), (f'vector({wrong_dim})',)]
+        mock_conn.execute.return_value = mock_result
+        
+        result = is_correct_embedding_size(expected_dim)
+        assert result is False
+
+    @pytest.mark.unit
+    @patch('mythologizer_postgres.db.get_engine')
+    def test_is_correct_embedding_size_wrong_count(self, mock_get_engine):
+        """Test is_correct_embedding_size function with wrong number of tables."""
+        # Get the expected embedding dimension from environment
+        expected_dim = int(os.getenv('EMBEDDING_DIM', '4'))
+        
+        mock_engine = MagicMock()
+        mock_get_engine.return_value = mock_engine
+        mock_conn = MagicMock()
+        mock_engine.connect.return_value.__enter__.return_value = mock_conn
+        
+        # Mock the query result with only one table
+        mock_result = MagicMock()
+        mock_result.fetchall.return_value = [(f'vector({expected_dim})',)]
+        mock_conn.execute.return_value = mock_result
+        
+        result = is_correct_embedding_size(expected_dim)
+        assert result is False
+
+    @pytest.mark.unit
+    @patch('mythologizer_postgres.db.get_engine')
+    def test_is_correct_embedding_size_database_error(self, mock_get_engine):
+        """Test is_correct_embedding_size function with database error."""
+        # Get the expected embedding dimension from environment
+        expected_dim = int(os.getenv('EMBEDDING_DIM', '4'))
+        
+        mock_engine = MagicMock()
+        mock_get_engine.return_value = mock_engine
+        mock_engine.connect.side_effect = Exception("Database connection failed")
+        
+        result = is_correct_embedding_size(expected_dim)
+        assert result is False
+
+    @pytest.mark.integration
+    def test_is_correct_embedding_size_integration(self, database_available, clean_database):
+        """Integration test for is_correct_embedding_size with real database."""
+        # Get the expected embedding dimension from environment
+        expected_dim = int(os.getenv('EMBEDDING_DIM', '4'))
+        
+        # Test that the function returns True for the correct dimension
+        result = is_correct_embedding_size(expected_dim)
+        assert result is True, f"Expected embedding dimension {expected_dim} should match database schema"
+        
+        # Test that the function returns False for incorrect dimensions
+        wrong_dim = expected_dim + 1
+        result = is_correct_embedding_size(wrong_dim)
+        assert result is False, f"Wrong embedding dimension {wrong_dim} should not match database schema"
+        
+        # Test with another wrong dimension
+        another_wrong_dim = expected_dim - 1 if expected_dim > 1 else expected_dim + 2
+        result = is_correct_embedding_size(another_wrong_dim)
+        assert result is False, f"Wrong embedding dimension {another_wrong_dim} should not match database schema" 

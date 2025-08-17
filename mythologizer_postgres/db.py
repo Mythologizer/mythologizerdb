@@ -231,3 +231,47 @@ def get_table_row_counts() -> Dict[str, int]:
     except Exception:
         logger.exception("Failed to get table row counts")
     return counts
+
+def is_correct_embedding_size(embedding_size: int) -> bool:
+    """
+    Check if the embedding size matches the vector dimensions in myths and mythemes tables.
+    
+    Args:
+        embedding_size: The embedding dimension to check against
+        
+    Returns:
+        True if the embedding size matches both tables, False otherwise
+    """
+    try:
+        with get_engine().connect() as conn:
+            # Simple query to get vector dimensions from both tables
+            result = conn.execute(text("""
+                SELECT 
+                    format_type(a.atttypid, a.atttypmod) as column_type
+                FROM pg_attribute a
+                JOIN pg_class c ON a.attrelid = c.oid
+                JOIN pg_namespace n ON c.relnamespace = n.oid
+                WHERE n.nspname = 'public'
+                AND c.relname IN ('myths', 'mythemes')
+                AND a.attname = 'embedding';
+            """))
+            
+            rows = result.fetchall()
+            
+            # Check if we found both tables and dimensions match
+            if len(rows) != 2:
+                logger.warning(f"Expected 2 embedding columns, found {len(rows)}")
+                return False
+            
+            # Verify both tables have the correct vector dimension
+            expected_type = f'vector({embedding_size})'
+            for row in rows:
+                if expected_type not in row[0]:
+                    logger.warning(f"Expected {expected_type}, found {row[0]}")
+                    return False
+            
+            return True
+            
+    except Exception as e:
+        logger.exception(f"Error checking embedding size: {e}")
+        return False
