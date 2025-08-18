@@ -1,0 +1,29 @@
+-- Get All Agent Attribute Definitions Query
+-- Retrieves all entries from the agent_attribute_defs table
+-- 
+-- Purpose: Fetch all attribute definition records for configuration, display,
+-- or validation purposes.
+-- 
+-- Returns: All columns for each attribute definition
+-- 
+-- Columns returned:
+--   - id: Unique identifier for the attribute definition
+--   - name: Attribute name
+--   - description: Human-readable description
+--   - atype: Attribute value type (ENUM: 'int' | 'float')
+--   - min_val: Optional minimum value
+--   - max_val: Optional maximum value
+--   - col_idx: Stable column position
+-- 
+-- Ordering: Results are ordered by col_idx for stable presentation
+-- 
+-- Example usage:
+--   SELECT id, name, description, atype, min_val, max_val, col_idx
+--   FROM agent_attribute_defs
+--   ORDER BY col_idx;
+
+SELECT id, name, description, atype, min_val, max_val, col_idx
+FROM agent_attribute_defs
+ORDER BY col_idx;
+
+

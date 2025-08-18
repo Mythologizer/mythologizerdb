@@ -1,10 +1,11 @@
 -- Create Agent Mutation
--- Inserts a new agent into the agents table and optionally associates them with cultures
+-- Inserts a new agent, initializes its attributes, and optionally associates it with cultures
 -- 
 -- Parameters:
 --   :name - Agent name (TEXT, required)
 --   :memory_size - Memory capacity (INT, must be >= 3)
 --   :culture_ids - Array of culture IDs to associate with the agent (INT[], optional)
+--   :attribute_values - Attribute values array aligned to defs by col_idx (DOUBLE PRECISION[], required)
 --
 -- Returns: The newly created agent's ID
 --
@@ -12,15 +13,23 @@
 --   INSERT INTO agents (name, memory_size) 
 --   VALUES ('Athena', 10);
 
--- Create the agent
-INSERT INTO agents (name, memory_size) 
-VALUES (:name, :memory_size)
-RETURNING id;
-
--- Associate agent with cultures if culture_ids are provided
+-- Create the agent, initialize attributes, and optionally associate cultures (CTE)
+WITH new_agent AS (
+  INSERT INTO agents (name, memory_size)
+  VALUES (:name, :memory_size)
+  RETURNING id
+),
+inserted_attrs AS (
+  INSERT INTO agent_attributes (agent_id, attribute_values)
+  SELECT id, :attribute_values FROM new_agent
+  RETURNING agent_id
+)
 {% if culture_ids %}
-INSERT INTO agent_cultures (agent_id, culture_id)
-SELECT 
-    (SELECT id FROM agents WHERE name = :name ORDER BY id DESC LIMIT 1) as agent_id,
-    unnest(:culture_ids) as culture_id;
+, inserted_cultures AS (
+  INSERT INTO agent_cultures (agent_id, culture_id)
+  SELECT id, unnest(:culture_ids)
+  FROM new_agent
+  RETURNING agent_id
+)
 {% endif %}
+SELECT id FROM new_agent;
