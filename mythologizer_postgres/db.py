@@ -211,6 +211,42 @@ def clear_all_rows() -> None:
         logger.exception("Error occurred while deleting rows")
         raise
 
+
+def drop_all_tables() -> None:
+    """
+    Drop all tables in the 'public' schema.
+    This will completely remove all table structures and data.
+    """
+    try:
+        with get_engine().begin() as conn:
+            # Disable foreign key checks temporarily
+            conn.execute(text("SET session_replication_role = replica;"))
+            
+            # Drop all tables in public schema
+            conn.execute(text("""
+                DO $$
+                DECLARE
+                    tbl RECORD;
+                BEGIN
+                    FOR tbl IN
+                        SELECT tablename
+                        FROM pg_tables
+                        WHERE schemaname = 'public'
+                    LOOP
+                        EXECUTE format('DROP TABLE IF EXISTS %I.%I CASCADE', 'public', tbl.tablename);
+                    END LOOP;
+                END $$;
+            """))
+            
+            # Re-enable foreign key checks
+            conn.execute(text("SET session_replication_role = DEFAULT;"))
+            
+        logger.info("All tables dropped from public schema")
+    except Exception:
+        logger.exception("Error occurred while dropping tables")
+        raise
+
+
 def get_table_row_counts() -> Dict[str, int]:
     """
     Returns a dictionary mapping table names in the 'public' schema to row counts.

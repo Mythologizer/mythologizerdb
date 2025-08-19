@@ -37,7 +37,10 @@ wait:
 	@echo "DB is ready."
 
 test_setup:
-	$(UV) pytest tests
+	$(UV) pytest tests --ignore=tests/test_drop_all_tables.py
+
+test_drop_all_tables:
+	$(UV) pytest tests/test_drop_all_tables.py -m "not skip" -v
 
 .PHONY: benchmark
 benchmark: fresh
@@ -48,5 +51,5 @@ benchmark-quick:
 	$(UV) python mythologizer_postgres/benchmark.py
 
 .PHONY: test
-test: fresh test_setup
+test: fresh test_setup test_drop_all_tables
 	$(COMPOSE) down -v --remove-orphans

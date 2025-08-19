@@ -4,12 +4,15 @@ import numpy as np
 from sqlalchemy import text
 
 from mythologizer_postgres.db import (
-    ping_db,
-    check_if_tables_exist,
-    get_table_row_counts,
-    clear_all_rows,
+    get_engine,
     session_scope,
     psycopg_connection,
+    apply_schemas,
+    check_if_tables_exist,
+    ping_db,
+    get_table_row_counts,
+    clear_all_rows,
+    is_correct_embedding_size,
 )
 
 

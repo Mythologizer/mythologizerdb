@@ -21,15 +21,12 @@ WITH new_agent AS (
 ),
 inserted_attrs AS (
   INSERT INTO agent_attributes (agent_id, attribute_values)
-  SELECT id, :attribute_values FROM new_agent
-  RETURNING agent_id
-)
-{% if culture_ids %}
-, inserted_cultures AS (
+  SELECT id, :attribute_values::double precision[] FROM new_agent
+),
+inserted_cultures AS (
   INSERT INTO agent_cultures (agent_id, culture_id)
-  SELECT id, unnest(:culture_ids)
-  FROM new_agent
-  RETURNING agent_id
+  SELECT na.id, cid
+  FROM new_agent na
+  CROSS JOIN LATERAL unnest(coalesce(:culture_ids::int[], '{}'::int[])) AS cid(cid)
 )
-{% endif %}
 SELECT id FROM new_agent;

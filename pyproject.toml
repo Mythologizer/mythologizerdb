@@ -1,6 +1,6 @@
 [project]
 name = "mythologizer_postgres"
-version = "0.1.0"
+version = "0.1.4"
 description = "PostgreSQL database connector for mythology data with vector embeddings"
 authors = [{ name = "Pierre-Louis Suckrow", email = "suckrowpierre@gmail.com" }]
 readme = "README.md"
@@ -80,4 +80,4 @@ where = ["."]
 include = ["mythologizer_postgres*"]
 
 [tool.setuptools.package-data]
-mythologizer_postgres = ["*.sql", "*.yaml", "*.yml"]
+mythologizer_postgres = ["*.sql", "*.yaml", "*.yml", "schemas/*.sql.j2", "schemas/*.sql"]

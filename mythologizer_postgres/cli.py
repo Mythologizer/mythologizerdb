@@ -23,9 +23,22 @@ def show_url(reveal_password: bool = typer.Option(False, "--reveal-password")):
     typer.echo(url_as_string(show_password=reveal_password))
 
 @app.command()
-def ping():
-    ping_db(get_connection())
-    typer.secho("OK", fg=typer.colors.GREEN)
+def ping(
+    timeout: float = typer.Option(5.0, "--timeout", "-t", help="Timeout in seconds for the ping attempt")
+):
+    """
+    Test database connectivity with a simple ping.
+    
+    Returns exit code 0 if successful, 1 if failed.
+    """
+    typer.echo(f"Pinging database (timeout: {timeout}s)...")
+    
+    if ping_db(timeout_seconds=timeout):
+        typer.secho("✓ Database connection successful", fg=typer.colors.GREEN)
+        raise typer.Exit(code=0)
+    else:
+        typer.secho("✗ Database connection failed", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
 
 @app.command("start")
 def start_db(
