@@ -50,13 +50,13 @@ def clean_database():
 @pytest.fixture(scope="session")
 def database_available():
     """Fixture to check if database is available for integration tests."""
-    from mythologizer_postgres.db import ping_db, get_engine
+    from mythologizer_postgres.db import ping_db_basic, get_engine
     
     # Clear the engine cache to ensure we get a real connection
     get_engine.cache_clear()
     
     try:
-        is_available = ping_db()
+        is_available = ping_db_basic()
         if not is_available:
             pytest.skip("Database is not available")
         return is_available
@@ -85,13 +85,13 @@ def pytest_configure(config):
 # Skip integration tests if database is not available
 def pytest_collection_modifyitems(config, items):
     """Modify test collection to skip integration tests if database is not available."""
-    from mythologizer_postgres.db import ping_db, get_engine
+    from mythologizer_postgres.db import ping_db_basic, get_engine
     
     # Clear engine cache before checking database availability
     get_engine.cache_clear()
     
     try:
-        db_available = ping_db()
+        db_available = ping_db_basic()
     except Exception:
         db_available = False
     

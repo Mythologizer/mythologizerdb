@@ -186,6 +186,30 @@ def ping_db(timeout_seconds: float = 5.0) -> bool:
         return False
 
 
+def ping_db_basic() -> bool:
+    """
+    Perform a lightweight check that the database is reachable using a basic engine.
+    This version doesn't require vector extensions to be available.
+    """
+    try:
+        # Use a basic engine without vector registration
+        basic_url = build_url()
+        basic_engine = create_engine(basic_url)
+        
+        with basic_engine.connect() as conn:
+            result = conn.execute(text("SELECT 1"))
+            row = result.fetchone()
+            success = bool(row and row[0] == 1)
+            if not success:
+                logger.warning("Basic ping query returned unexpected result %s", row)
+        
+        basic_engine.dispose()
+        return success
+    except Exception:
+        logger.exception("Basic database ping failed")
+        return False
+
+
 def clear_all_rows() -> None:
     """
     Delete all rows from all user-defined tables in the 'public' schema.
@@ -214,36 +238,176 @@ def clear_all_rows() -> None:
 
 def drop_all_tables() -> None:
     """
-    Drop all tables in the 'public' schema.
-    This will completely remove all table structures and data.
+    Drop all database objects in the 'public' schema.
+    This will completely remove all tables, views, functions, triggers, 
+    types, extensions, and other database objects.
     """
     try:
-        with get_engine().begin() as conn:
+        # Use a basic engine without vector registration to avoid dependency issues
+        basic_url = build_url()
+        basic_engine = create_engine(basic_url)
+        
+        with basic_engine.begin() as conn:
             # Disable foreign key checks temporarily
             conn.execute(text("SET session_replication_role = replica;"))
             
-            # Drop all tables in public schema
+            # Drop all objects in public schema
             conn.execute(text("""
                 DO $$
                 DECLARE
-                    tbl RECORD;
+                    obj RECORD;
+                    obj_type TEXT;
+                    obj_name TEXT;
+                    obj_schema TEXT;
                 BEGIN
-                    FOR tbl IN
-                        SELECT tablename
-                        FROM pg_tables
+                    -- Drop all triggers first
+                    FOR obj IN
+                        SELECT 
+                            trigger_name as name,
+                            event_object_table as table_name
+                        FROM information_schema.triggers 
+                        WHERE trigger_schema = 'public'
+                    LOOP
+                        EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I CASCADE', obj.name, obj.table_name);
+                    END LOOP;
+                    
+                    -- Drop all views
+                    FOR obj IN
+                        SELECT viewname as name
+                        FROM pg_views 
                         WHERE schemaname = 'public'
                     LOOP
-                        EXECUTE format('DROP TABLE IF EXISTS %I.%I CASCADE', 'public', tbl.tablename);
+                        EXECUTE format('DROP VIEW IF EXISTS %I CASCADE', obj.name);
                     END LOOP;
+                    
+                    -- Drop all tables
+                    FOR obj IN
+                        SELECT tablename as name
+                        FROM pg_tables 
+                        WHERE schemaname = 'public'
+                    LOOP
+                        EXECUTE format('DROP TABLE IF EXISTS %I CASCADE', obj.name);
+                    END LOOP;
+                    
+                    -- Drop all functions (excluding those owned by extensions)
+                    FOR obj IN
+                        SELECT 
+                            p.proname as name,
+                            pg_get_function_identity_arguments(p.oid) as args
+                        FROM pg_proc p
+                        JOIN pg_namespace n ON p.pronamespace = n.oid
+                        WHERE n.nspname = 'public'
+                        AND NOT EXISTS (
+                            SELECT 1 FROM pg_depend d
+                            JOIN pg_extension e ON d.refobjid = e.oid
+                            WHERE d.objid = p.oid
+                        )
+                    LOOP
+                        EXECUTE format('DROP FUNCTION IF EXISTS %I(%s) CASCADE', obj.name, obj.args);
+                    END LOOP;
+                    
+                    -- Drop all sequences
+                    FOR obj IN
+                        SELECT sequence_name as name
+                        FROM information_schema.sequences 
+                        WHERE sequence_schema = 'public'
+                    LOOP
+                        EXECUTE format('DROP SEQUENCE IF EXISTS %I CASCADE', obj.name);
+                    END LOOP;
+                    
+                    -- Drop all custom types (enums, etc.)
+                    FOR obj IN
+                        SELECT typname as name
+                        FROM pg_type t
+                        JOIN pg_namespace n ON t.typnamespace = n.oid
+                        WHERE n.nspname = 'public'
+                        AND t.typtype = 'e'  -- enum types
+                    LOOP
+                        EXECUTE format('DROP TYPE IF EXISTS %I CASCADE', obj.name);
+                    END LOOP;
+                    
+                    -- Drop all domains
+                    FOR obj IN
+                        SELECT domain_name as name
+                        FROM information_schema.domains 
+                        WHERE domain_schema = 'public'
+                    LOOP
+                        EXECUTE format('DROP DOMAIN IF EXISTS %I CASCADE', obj.name);
+                    END LOOP;
+                    
+                    -- Drop all indexes (though they should be dropped with tables)
+                    FOR obj IN
+                        SELECT indexname as name
+                        FROM pg_indexes 
+                        WHERE schemaname = 'public'
+                    LOOP
+                        EXECUTE format('DROP INDEX IF EXISTS %I CASCADE', obj.name);
+                    END LOOP;
+                    
                 END $$;
             """))
             
             # Re-enable foreign key checks
             conn.execute(text("SET session_replication_role = DEFAULT;"))
-            
-        logger.info("All tables dropped from public schema")
+        
+        basic_engine.dispose()
+        logger.info("All database objects dropped from public schema")
     except Exception:
-        logger.exception("Error occurred while dropping tables")
+        logger.exception("Error occurred while dropping database objects")
+        raise
+
+
+def drop_all_extensions() -> None:
+    """
+    Drop all extensions from the database.
+    This will remove all installed extensions including pgvector.
+    """
+    try:
+        # Use a basic engine without vector registration to avoid dependency issues
+        basic_url = build_url()
+        basic_engine = create_engine(basic_url)
+        
+        with basic_engine.begin() as conn:
+            # Drop all extensions
+            conn.execute(text("""
+                DO $$
+                DECLARE
+                    ext RECORD;
+                BEGIN
+                    FOR ext IN
+                        SELECT extname as name
+                        FROM pg_extension
+                        WHERE extname != 'plpgsql'  -- Don't drop the default plpgsql extension
+                    LOOP
+                        EXECUTE format('DROP EXTENSION IF EXISTS %I CASCADE', ext.name);
+                    END LOOP;
+                END $$;
+            """))
+        
+        basic_engine.dispose()
+        logger.info("All extensions dropped from database")
+    except Exception:
+        logger.exception("Error occurred while dropping extensions")
+        raise
+
+
+def drop_everything() -> None:
+    """
+    Drop all database objects and extensions.
+    This is the most comprehensive cleanup function that removes everything.
+    """
+    try:
+        logger.info("Starting comprehensive database cleanup...")
+        
+        # First drop all extensions (this will also drop their functions)
+        drop_all_extensions()
+        
+        # Then drop all remaining database objects in public schema
+        drop_all_tables()
+        
+        logger.info("Complete database cleanup finished")
+    except Exception:
+        logger.exception("Error occurred during comprehensive database cleanup")
         raise
 
 

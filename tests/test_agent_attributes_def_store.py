@@ -124,4 +124,76 @@ class TestAgentAttributeDefStore:
         assert min_vals_f == [0.5, 1.0]
         assert max_vals_f == [99.5, 999.0]
 
+    @pytest.mark.integration
+    def test_insert_with_pydantic_objects(self):
+        # Mock Pydantic-like object
+        class MockAgentAttribute:
+            def __init__(self, name, description, d_type, min=None, max=None):
+                self.name = name
+                self.description = description
+                self.d_type = d_type
+                self.min = min
+                self.max = max
+            
+            def model_dump(self):
+                return {
+                    "name": self.name,
+                    "description": self.description,
+                    "d_type": self.d_type,
+                    "min": self.min,
+                    "max": self.max
+                }
+
+        defs = [
+            MockAgentAttribute(
+                name='Age',
+                description='Age of the agent',
+                d_type=int,
+                min=0
+            ),
+            MockAgentAttribute(
+                name='Confidence',
+                description='The confidence of the agent',
+                d_type=float,
+                min=0.0,
+                max=1.0
+            ),
+            MockAgentAttribute(
+                name='Emotionality',
+                description='The emotionality of the agent',
+                d_type=float,
+                min=0.0,
+                max=1.0
+            )
+        ]
+
+        insert_agent_attribute_defs(defs)
+
+        engine = get_engine()
+        with engine.connect() as conn:
+            rows = conn.execute(text(
+                """
+                SELECT id, name, description, atype, min_val, max_val, col_idx
+                  FROM public.agent_attribute_defs
+                 ORDER BY col_idx ASC
+                """
+            )).all()
+        ids, names, descriptions, atypes, min_vals, max_vals, col_idxs = zip(*rows)
+        names = list(names)
+        descriptions = list(descriptions)
+        atypes = list(atypes)
+        col_idxs = list(col_idxs)
+
+        assert len(ids) == 3
+        assert names == ['Age', 'Confidence', 'Emotionality']
+        assert descriptions == ['Age of the agent', 'The confidence of the agent', 'The emotionality of the agent']
+        assert atypes == ['int', 'float', 'float']
+        assert col_idxs == [0, 1, 2]
+
+        # Coerce for comparison
+        min_vals_f = [float(v) if v is not None else None for v in min_vals]
+        max_vals_f = [float(v) if v is not None else None for v in max_vals]
+        assert min_vals_f == [0.0, 0.0, 0.0]
+        assert max_vals_f == [None, 1.0, 1.0]
+
 

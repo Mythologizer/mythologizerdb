@@ -8,7 +8,7 @@ import typer
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 
-from .db import ping_db, apply_schemas, build_url, clear_all_rows, get_table_row_counts, check_if_tables_exist
+from .db import ping_db, ping_db_basic, apply_schemas, build_url, clear_all_rows, get_table_row_counts, check_if_tables_exist, drop_all_tables, drop_all_extensions, drop_everything
 
 from sqlalchemy.engine.url import URL
 
@@ -94,6 +94,54 @@ def clear(
     typer.secho("All rows deleted", fg=typer.colors.RED)
 
 
+@app.command("drop-tables")
+def drop_tables(
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation")
+):
+    """
+    Drop all tables and database objects in the public schema.
+    """
+    if not yes and not typer.confirm(
+        "This will drop all tables, views, functions, triggers, and types. Continue?"
+    ):
+        raise typer.Abort()
+
+    drop_all_tables()
+    typer.secho("All tables and database objects dropped", fg=typer.colors.RED)
+
+
+@app.command("drop-extensions")
+def drop_extensions(
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation")
+):
+    """
+    Drop all extensions from the database.
+    """
+    if not yes and not typer.confirm(
+        "This will drop all extensions including pgvector. Continue?"
+    ):
+        raise typer.Abort()
+
+    drop_all_extensions()
+    typer.secho("All extensions dropped", fg=typer.colors.RED)
+
+
+@app.command("drop-everything")
+def drop_all(
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation")
+):
+    """
+    Drop all database objects and extensions. Complete database cleanup.
+    """
+    if not yes and not typer.confirm(
+        "This will drop EVERYTHING from the database. This is irreversible! Continue?"
+    ):
+        raise typer.Abort()
+
+    drop_everything()
+    typer.secho("Complete database cleanup finished", fg=typer.colors.RED)
+
+
 @app.command("setup")
 def setup_db(
     dim: Optional[int] = typer.Option(None, "--dim", help="Embedding dimensionality (e.g. 384, 768)")
@@ -152,6 +200,17 @@ def status(dim: int = typer.Option(384, help="Embedding dimensionality used to g
         typer.secho("Database connection OK", fg=typer.colors.GREEN)
     else:
         typer.secho("Database not reachable", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+
+@app.command("ping")
+def ping():
+    """Basic database connectivity check (doesn't require vector extensions)."""
+    typer.echo("Checking basic database connectivity...")
+    if ping_db_basic():
+        typer.secho("Basic database connection OK", fg=typer.colors.GREEN)
+    else:
+        typer.secho("Basic database connection failed", fg=typer.colors.RED)
         raise typer.Exit(code=1)
 
     typer.echo("Checking required tables...")

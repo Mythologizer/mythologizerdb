@@ -1,4 +1,4 @@
-from typing import List, Optional, Sequence, Tuple, Mapping, Any
+from typing import List, Optional, Sequence, Tuple, Mapping, Any, Union
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
@@ -6,16 +6,16 @@ from mythologizer_postgres.db import get_engine
 
 EngineT = Engine
 
-def insert_agent_attribute_defs(defs: Sequence[Mapping[str, Any]]) -> None:
+def insert_agent_attribute_defs(defs: Sequence[Union[Mapping[str, Any], Any]]) -> None:
     """
     Insert attribute definitions from a list of objects.
 
-   defs is a list of dicts, each with the following keys:
+   defs is a list of dicts or Pydantic objects, each with the following keys:
    - name: str
-   - type: str
+   - type/atype/d_type: str or type
    - description: str
-   - min_val: float
-   - max_val: float
+   - min_val/min/min_value: float
+   - max_val/max/max_value: float
    - col_idx: int
    
     """
@@ -23,6 +23,10 @@ def insert_agent_attribute_defs(defs: Sequence[Mapping[str, Any]]) -> None:
 
     if not defs:
         return
+
+    # Convert Pydantic objects to dictionaries if needed
+    if defs and hasattr(defs[0], 'model_dump'):
+        defs = [d.model_dump() for d in defs]
 
     records = []
     for idx, d in enumerate(defs):
@@ -56,6 +60,19 @@ def insert_agent_attribute_defs(defs: Sequence[Mapping[str, Any]]) -> None:
             min_val = float(min_val)
         if max_val is not None:
             max_val = float(max_val)
+
+        # Handle type conversion - atype can be a Python type or string
+        if isinstance(atype, type):
+            if atype == int:
+                atype = "int"
+            elif atype == float:
+                atype = "float"
+            else:
+                raise ValueError(f"Unsupported type: {atype}. Only 'int' and 'float' are supported.")
+        elif isinstance(atype, str):
+            atype = atype.lower()
+        else:
+            raise ValueError(f"Invalid type format: {atype}. Must be 'int', 'float', or a Python type.")
 
         # Validate type
         if atype not in ("int", "float"):
