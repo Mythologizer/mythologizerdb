@@ -16,6 +16,14 @@ from .mythicalgebra.mythic_algebra_connector import (
     recalc_and_update_myths,
 )
 from .agent_attributes_def_store import insert_agent_attribute_defs
+from .status import (
+    get_current_epoch,
+    increment_epoch,
+    get_n_agents,
+    get_n_myths,
+    get_n_cultures,
+    get_simulation_status,
+)
 
 # Import mythicalgebra subpackage
 from . import mythicalgebra
@@ -40,6 +48,13 @@ __all__ = [
     "recalc_and_update_myths",
     # Agent attribute defs
     "insert_agent_attribute_defs",
+    # Status functions
+    "get_current_epoch",
+    "increment_epoch",
+    "get_n_agents",
+    "get_n_myths",
+    "get_n_cultures",
+    "get_simulation_status",
     # Subpackages
     "mythicalgebra",
 ]

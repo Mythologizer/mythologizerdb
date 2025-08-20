@@ -39,6 +39,7 @@ def get_schemas(folder: str = "schemas", **kwargs) -> Iterator[str]:
         "agents_cultures.sql.j2", # Junction tables
         "agents_myths.sql.j2",   # Junction tables
         "myth_writings.sql.j2",  # Dependent tables
+        "epoch.sql.j2",         # Dependent tables
     ]
     
     # Process files in dependency order

@@ -1,0 +1,7 @@
+CREATE TABLE epoch (
+    key TEXT PRIMARY KEY CHECK (key = 'only'),
+    current_epoch INTEGER NOT NULL DEFAULT 0 CHECK (current_epoch >= 0)
+);
+
+-- Insert the initial epoch record
+INSERT INTO epoch (key, current_epoch) VALUES ('only', 0);
