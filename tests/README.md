@@ -2,7 +2,7 @@
 
 ## Overview
 
-Comprehensive test suite for the mythologizer database system with 55 tests covering unit, integration, and connector operations.
+Comprehensive test suite for the mythologizer database system with 163 tests covering unit, integration, connector operations, and concurrent operations.
 
 ## Test Structure
 
@@ -40,6 +40,17 @@ Comprehensive test suite for the mythologizer database system with 55 tests cove
 - Myth recalculation and updating with matrices
 - Complex matrix operations with multiple mythemes
 
+### Concurrent Operations Tests (`test_concurrent_operations.py`)
+- Concurrent myth insertions and queries from multiple threads
+- Concurrent mytheme operations (inserts and queries)
+- Concurrent updates and queries with data integrity verification
+- Concurrent bulk operations for myths and mythemes
+- Concurrent epoch operations (increments and queries)
+- Mixed operations (inserts, updates, queries, deletes) running simultaneously
+- High concurrency thread simulation for realistic load testing
+- Simulation status monitoring in loops while concurrently adding mythemes
+- Verification of data consistency and operation completion under concurrent load
+
 ## Running Tests
 
 ```bash
@@ -52,6 +63,7 @@ uv run --env-file .env.test pytest tests/test_db_integration.py -v        # Inte
 uv run --env-file .env.test pytest tests/test_mytheme_store.py -v         # Mytheme store tests
 uv run --env-file .env.test pytest tests/test_myth_store.py -v            # Myth store tests
 uv run --env-file .env.test pytest tests/test_mythic_algebra_connector.py -v  # Mythic algebra tests
+uv run --env-file .env.test pytest tests/test_concurrent_operations.py -v # Concurrent operations tests
 
 # Run with fresh database
 make fresh && uv run --env-file .env.test pytest tests -v
@@ -66,6 +78,7 @@ make fresh && uv run --env-file .env.test pytest tests -v
 4. **Mytheme Operations**: CRUD operations, bulk insertions, data integrity
 5. **Myth Operations**: Complex nested structures, matrix operations, precision testing
 6. **Mythic Algebra**: Matrix composition/decomposition, myth recalculation
+7. **Concurrent Operations**: Multi-threaded operations, data consistency under load
 
 ### Data Integrity Verification
 - **High Precision**: 7 decimal place precision for all vector components

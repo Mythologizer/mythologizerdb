@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple, Union, Sequence
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from mythologizer_postgres.db import get_engine
+from mythologizer_postgres.db import get_engine, psycopg_connection
 
 EngineT = Engine
 
@@ -72,21 +72,16 @@ def insert_mythemes_bulk(
     sentences[i] pairs with embeddings[i].
     Accepts embeddings as a numpy.ndarray (n, dim) or list of lists.
     """
-    engine: EngineT = get_engine()
-
     if isinstance(embeddings, np.ndarray):
         embeddings_list = embeddings.tolist()
     else:
         embeddings_list = embeddings
 
-    sql_text = text("""
-        INSERT INTO public.mythemes (sentence, embedding)
-        VALUES (:sentence, :embedding)
-    """)
-    records = [
-        {"sentence": s, "embedding": e}
-        for s, e in zip(sentences, embeddings_list)
-    ]
-
-    with engine.begin() as conn:
-        conn.execute(sql_text, records)
+    with psycopg_connection() as conn:
+        with conn.cursor() as cur:
+            for sentence, embedding in zip(sentences, embeddings_list):
+                cur.execute("""
+                    INSERT INTO public.mythemes (sentence, embedding)
+                    VALUES (%s, %s)
+                """, (sentence, embedding))
+            conn.commit()
