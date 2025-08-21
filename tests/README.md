@@ -2,7 +2,7 @@
 
 ## Overview
 
-Comprehensive test suite for the mythologizer database system with 163 tests covering unit, integration, connector operations, and concurrent operations.
+Comprehensive test suite for the mythologizer database system with 177 tests covering unit, integration, connector operations, and concurrent operations.
 
 ## Test Structure
 
@@ -25,6 +25,13 @@ Comprehensive test suite for the mythologizer database system with 163 tests cov
 - Mixed bulk/single operations
 - High-precision floating-point testing
 - Large-scale operations (4 < n < 20 mythemes)
+
+### Culture Store Tests (`test_culture_store.py`)
+- Single and bulk culture operations (insert, get, update, delete)
+- Culture search by name (exact match and pattern matching)
+- Case-insensitive name search functionality
+- Input validation and error handling
+- Empty result handling and edge cases
 
 ### Myth Store Tests (`test_myth_store.py`)
 - Complex nested data structures
@@ -49,6 +56,7 @@ Comprehensive test suite for the mythologizer database system with 163 tests cov
 - Mixed operations (inserts, updates, queries, deletes) running simultaneously
 - High concurrency thread simulation for realistic load testing
 - Simulation status monitoring in loops while concurrently adding mythemes
+- Concurrent culture operations (inserts, queries, updates, deletes)
 - Verification of data consistency and operation completion under concurrent load
 
 ## Running Tests
@@ -63,6 +71,7 @@ uv run --env-file .env.test pytest tests/test_db_integration.py -v        # Inte
 uv run --env-file .env.test pytest tests/test_mytheme_store.py -v         # Mytheme store tests
 uv run --env-file .env.test pytest tests/test_myth_store.py -v            # Myth store tests
 uv run --env-file .env.test pytest tests/test_mythic_algebra_connector.py -v  # Mythic algebra tests
+uv run --env-file .env.test pytest tests/test_culture_store.py -v             # Culture store tests
 uv run --env-file .env.test pytest tests/test_concurrent_operations.py -v # Concurrent operations tests
 
 # Run with fresh database
@@ -77,8 +86,9 @@ make fresh && uv run --env-file .env.test pytest tests -v
 3. **Vector Operations**: pgvector integration, similarity search, precision testing
 4. **Mytheme Operations**: CRUD operations, bulk insertions, data integrity
 5. **Myth Operations**: Complex nested structures, matrix operations, precision testing
-6. **Mythic Algebra**: Matrix composition/decomposition, myth recalculation
-7. **Concurrent Operations**: Multi-threaded operations, data consistency under load
+6. **Culture Operations**: CRUD operations, name search, bulk operations
+7. **Mythic Algebra**: Matrix composition/decomposition, myth recalculation
+8. **Concurrent Operations**: Multi-threaded operations, data consistency under load
 
 ### Data Integrity Verification
 - **High Precision**: 7 decimal place precision for all vector components
