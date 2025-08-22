@@ -1,0 +1,6 @@
+CREATE TABLE events (
+    id SERIAL PRIMARY KEY,
+    description TEXT NOT NULL,
+    has_been_triggered BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);

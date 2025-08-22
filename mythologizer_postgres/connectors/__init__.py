@@ -32,6 +32,11 @@ from .culture_store import (
     update_culture,
     delete_culture,
 )
+from .events_store import (
+    insert_event,
+    get_next_event,
+    set_event_triggered,
+)
 # Import mythicalgebra subpackage
 from . import mythicalgebra
 
@@ -71,4 +76,8 @@ __all__ = [
     "insert_cultures_bulk",
     "update_culture",
     "delete_culture",
+    # Events functions
+    "insert_event",
+    "get_next_event",
+    "set_event_triggered",
 ]

@@ -36,6 +36,7 @@ def get_schemas(folder: str = "schemas", **kwargs) -> Iterator[str]:
         "agent_attributes.sql.j2", # Base tables
         "mythemes.sql.j2",       # Base tables
         "myths.sql.j2",          # Base tables
+        "events.sql.j2",         # Base tables
         "agents_cultures.sql.j2", # Junction tables
         "agents_myths.sql.j2",   # Junction tables
         "myth_writings.sql.j2",  # Dependent tables
