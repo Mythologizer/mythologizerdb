@@ -1,7 +1,7 @@
 # Myth algebra connector functions
 from .mythic_algebra_connector import (
     get_myth_embeddings,
-    get_myth_matrices,
+    get_myth_matrices_and_embedding_ids,
     recalc_and_update_myths,
 )
 from ..myth_store import get_myth, get_myths_bulk, update_myth, update_myths_bulk
@@ -27,7 +27,7 @@ __all__ = [
     "update_myth",
     "update_myths_bulk",
     "get_myth_embeddings",
-    "get_myth_matrices",
+    "get_myth_matrices_and_embedding_ids",
     "recalc_and_update_myths",
     "decompose_myth_matrix",
     "compose_myth_matrix",

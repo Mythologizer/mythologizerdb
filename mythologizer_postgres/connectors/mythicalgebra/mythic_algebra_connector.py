@@ -15,8 +15,65 @@ from mythicalgebra import (
     compute_myth_embedding,
 )
 
-from ..myth_store import get_myth, get_myths_bulk
+from ..myth_store import get_myth, get_myths_bulk, insert_myth
 from ..mytheme_store import get_mythemes_bulk
+from mythologizer_postgres.db import psycopg_connection
+
+
+def insert_myth_to_agent_memory(
+    agent_id: int,
+    myth_matrix: NDArray[np.floating],
+    embedding_ids: List[int],
+    embedding: Optional[NDArray[np.floating]] = None
+) -> int:
+    """
+    Insert a new myth to an agent's memory.
+    
+    This function:
+    1. Creates a new entry in the myths table with the provided myth_matrix and embedding_ids
+    2. Creates an entry in agent_myths with retention = 1
+    3. The position is automatically assigned by the push_agent_myth trigger
+    
+    Args:
+        agent_id: The ID of the agent to add the myth to
+        myth_matrix: The myth matrix (numpy array) containing embeddings, offsets, and weights
+        embedding_ids: List of embedding IDs for the myth
+        embedding: Optional main embedding. If not provided, it will be computed from the myth_matrix
+    
+    Returns:
+        The ID of the newly created myth
+    
+    Raises:
+        ValueError: If agent_id doesn't exist or if myth_matrix is invalid
+    """
+    
+    # Decompose the myth matrix to get embeddings, offsets, and weights
+    embeddings, offsets, weights = decompose_myth_matrix(myth_matrix)
+    
+    # Compute the main embedding if not provided
+    if embedding is None:
+        embedding = compute_myth_embedding(myth_matrix)
+    
+    # Insert the myth into the myths table
+    myth_id = insert_myth(
+        main_embedding=embedding,
+        embedding_ids=embedding_ids,
+        offsets=offsets,
+        weights=weights
+    )
+    
+    # Insert the myth into the agent's memory with retention = 1
+    # The position will be automatically assigned by the push_agent_myth trigger
+    with psycopg_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO agent_myths (myth_id, agent_id, position, retention)
+                VALUES (%s, %s, %s, %s)
+            """, (myth_id, agent_id, 1, 1.0))  # position will be overridden by trigger
+            
+            conn.commit()
+    
+    return myth_id
 
 
 def get_myth_embeddings(myth_ids: Union[int, List[int]]) -> Union[NDArray[np.floating], List[NDArray[np.floating]]]:
@@ -49,16 +106,16 @@ def get_myth_embeddings(myth_ids: Union[int, List[int]]) -> Union[NDArray[np.flo
         return main_embeddings
 
 
-def get_myth_matrices(myth_ids: Union[int, List[int]]) -> Union[NDArray[np.floating], List[NDArray[np.floating]]]:
+def get_myth_matrices_and_embedding_ids(myth_ids: Union[int, List[int]]) -> Union[Tuple[NDArray[np.floating], List[int]], List[Tuple[NDArray[np.floating], List[int]]]]:
     """
-    Get the myth matrices for one or more myths.
+    Get the myth matrices and embedding IDs for one or more myths.
     A myth matrix combines embeddings, offsets, and weights into a single array.
     
     Args:
         myth_ids: Single myth ID or list of myth IDs
     
     Returns:
-        Single myth matrix or list of myth matrices
+        Single (myth_matrix, embedding_ids) tuple or list of (myth_matrix, embedding_ids) tuples
     """
     
     if isinstance(myth_ids, int):
@@ -84,7 +141,7 @@ def get_myth_matrices(myth_ids: Union[int, List[int]]) -> Union[NDArray[np.float
         
         # Compose myth matrix
         myth_matrix = compose_myth_matrix(embeddings, offsets, weights)
-        return myth_matrix
+        return (myth_matrix, embedding_ids)
         
     else:
         # Multiple myths
@@ -107,8 +164,8 @@ def get_myth_matrices(myth_ids: Union[int, List[int]]) -> Union[NDArray[np.float
         mytheme_ids, _, mytheme_embeddings = get_mythemes_bulk(unique_embedding_ids)
         mytheme_embeddings_dict = dict(zip(mytheme_ids, mytheme_embeddings))
         
-        # Build myth matrices
-        myth_matrices = []
+        # Build myth matrices and collect embedding IDs
+        result = []
         for embedding_ids, offsets, weights in zip(embedding_ids_list, offsets_list, weights_list):
             # Get embeddings for this myth's embedding IDs
             embeddings = [mytheme_embeddings_dict[eid] for eid in embedding_ids]
@@ -118,9 +175,9 @@ def get_myth_matrices(myth_ids: Union[int, List[int]]) -> Union[NDArray[np.float
             
             # Compose myth matrix
             myth_matrix = compose_myth_matrix(embeddings, offsets, weights)
-            myth_matrices.append(myth_matrix)
+            result.append((myth_matrix, embedding_ids))
         
-        return myth_matrices
+        return result
 
 
 def recalc_and_update_myths(
@@ -209,7 +266,8 @@ def recalc_and_update_myths(
             
         elif isinstance(myth_data[0], int):
             # List of myth IDs - recalculate from existing data
-            myth_matrices = get_myth_matrices(myth_data)
+            myth_matrices_and_embedding_ids = get_myth_matrices_and_embedding_ids(myth_data)
+            myth_matrices = [matrix for matrix, _ in myth_matrices_and_embedding_ids]
             updated_ids = []
             
             for myth_id, myth_matrix in zip(myth_data, myth_matrices):

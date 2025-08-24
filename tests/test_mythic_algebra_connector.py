@@ -5,8 +5,9 @@ from typing import List, Tuple
 
 from mythologizer_postgres.connectors.mythicalgebra.mythic_algebra_connector import (
     get_myth_embeddings,
-    get_myth_matrices,
+    get_myth_matrices_and_embedding_ids,
     recalc_and_update_myths,
+    insert_myth_to_agent_memory,
 )
 
 from mythologizer_postgres.connectors.myth_store import (
@@ -27,6 +28,9 @@ from mythicalgebra import (
     compose_myth_matrix,
     compute_myth_embedding,
 )
+
+from mythologizer_postgres.db import get_engine
+from sqlalchemy import text
 
 
 def get_embedding_dim():
@@ -197,8 +201,8 @@ class TestMythicAlgebraConnector:
             get_myth_embeddings(99999)
     
     @pytest.mark.integration
-    def test_get_myth_matrices_single(self):
-        """Test getting a single myth matrix."""
+    def test_get_myth_matrices_and_embedding_ids_single(self):
+        """Test getting a single myth matrix and embedding IDs."""
         embedding_dim = get_embedding_dim()
         
         # Create and insert mythemes first
@@ -223,12 +227,15 @@ class TestMythicAlgebraConnector:
         
         myth_id = insert_myth(main_embedding, embedding_ids, offsets, weights)
         
-        # Get myth matrix
-        myth_matrix = get_myth_matrices(myth_id)
+        # Get myth matrix and embedding IDs
+        myth_matrix, returned_embedding_ids = get_myth_matrices_and_embedding_ids(myth_id)
         
         # Verify matrix shape
         expected_shape = (2, 2 * embedding_dim + 1)  # 2 mythemes, 2D+1 columns
         assert myth_matrix.shape == expected_shape, f"Expected shape {expected_shape}, got {myth_matrix.shape}"
+        
+        # Verify embedding IDs
+        assert returned_embedding_ids == embedding_ids, "Returned embedding IDs should match original"
         
         # Decompose and verify integrity
         decomp_embeddings, decomp_offsets, decomp_weights = decompose_myth_matrix(myth_matrix)
@@ -254,8 +261,8 @@ class TestMythicAlgebraConnector:
         )
     
     @pytest.mark.integration
-    def test_get_myth_matrices_multiple(self):
-        """Test getting multiple myth matrices."""
+    def test_get_myth_matrices_and_embedding_ids_multiple(self):
+        """Test getting multiple myth matrices and embedding IDs."""
         embedding_dim = get_embedding_dim()
         
         # Create and insert mythemes first
@@ -291,17 +298,20 @@ class TestMythicAlgebraConnector:
         
         myth_ids = insert_myths_bulk(main_embeddings, embedding_ids_list, offsets_list, weights_list)
         
-        # Get myth matrices
-        myth_matrices = get_myth_matrices(myth_ids)
+        # Get myth matrices and embedding IDs
+        myth_matrices_and_embedding_ids = get_myth_matrices_and_embedding_ids(myth_ids)
         
-        # Verify we got the expected number of matrices
-        assert len(myth_matrices) == len(myth_ids)
+        # Verify we got the expected number of results
+        assert len(myth_matrices_and_embedding_ids) == len(myth_ids)
         
-        # Verify each matrix
-        for i, myth_matrix in enumerate(myth_matrices):
+        # Verify each matrix and embedding IDs
+        for i, (myth_matrix, returned_embedding_ids) in enumerate(myth_matrices_and_embedding_ids):
             # Verify matrix shape
             expected_shape = (2, 2 * embedding_dim + 1)  # 2 mythemes per myth
             assert myth_matrix.shape == expected_shape, f"Matrix {i} has wrong shape"
+            
+            # Verify embedding IDs
+            assert returned_embedding_ids == embedding_ids_list[i], f"Matrix {i} embedding IDs should match original"
             
             # Decompose and verify integrity
             decomp_embeddings, decomp_offsets, decomp_weights = decompose_myth_matrix(myth_matrix)
@@ -328,10 +338,10 @@ class TestMythicAlgebraConnector:
             )
     
     @pytest.mark.integration
-    def test_get_myth_matrices_not_found(self):
+    def test_get_myth_matrices_and_embedding_ids_not_found(self):
         """Test error handling for non-existent myth."""
         with pytest.raises(ValueError, match="Myth 99999 not found"):
-            get_myth_matrices(99999)
+            get_myth_matrices_and_embedding_ids(99999)
     
     @pytest.mark.integration
     def test_recalc_and_update_myths_with_matrices(self):
@@ -433,7 +443,7 @@ class TestMythicAlgebraConnector:
         myth_id = insert_myth(main_embedding, embedding_ids, offsets, weights)
         
         # Get the myth matrix to compute expected embedding
-        myth_matrix = get_myth_matrices(myth_id)
+        myth_matrix, _ = get_myth_matrices_and_embedding_ids(myth_id)
         expected_embedding = compute_myth_embedding(myth_matrix)
         
         # Recalculate from existing data
@@ -581,14 +591,14 @@ class TestMythicAlgebraConnector:
         
         myth_ids = insert_myths_bulk(main_embeddings, embedding_ids_list, offsets_list, weights_list)
         
-        # Get myth matrices
-        myth_matrices = get_myth_matrices(myth_ids)
+        # Get myth matrices and embedding IDs
+        myth_matrices_and_embedding_ids = get_myth_matrices_and_embedding_ids(myth_ids)
         
         # Verify matrices
-        assert len(myth_matrices) == 2
+        assert len(myth_matrices_and_embedding_ids) == 2
         
         # Test each matrix
-        for i, myth_matrix in enumerate(myth_matrices):
+        for i, (myth_matrix, embedding_ids) in enumerate(myth_matrices_and_embedding_ids):
             # Verify matrix properties
             inferred_dim = infer_embedding_dim(myth_matrix)
             assert inferred_dim == embedding_dim, f"Matrix {i} has wrong inferred dimension"
@@ -624,3 +634,120 @@ class TestMythicAlgebraConnector:
             # Test myth embedding computation
             computed_embedding = compute_myth_embedding(myth_matrix)
             assert computed_embedding.shape == (embedding_dim,), f"Matrix {i} computed embedding has wrong shape" 
+
+    @pytest.mark.integration
+    def test_insert_myth_to_agent_memory(self):
+        """Test inserting a myth to an agent's memory."""
+        # Create test data
+        embedding_dim = 4
+        num_mythemes = 3
+        
+        # Create a simple myth matrix
+        embeddings = np.random.rand(num_mythemes, embedding_dim).astype(np.float32)
+        offsets = np.random.rand(num_mythemes, embedding_dim).astype(np.float32)
+        weights = np.random.rand(num_mythemes).astype(np.float32)
+        
+        # Compose myth matrix
+        from mythicalgebra import compose_myth_matrix
+        myth_matrix = compose_myth_matrix(embeddings, offsets, weights)
+        
+        # Create embedding IDs
+        embedding_ids = [1, 2, 3]
+        
+        # Insert an agent first
+        engine = get_engine()
+        with engine.connect() as conn:
+            conn.execute(text("INSERT INTO agents (name, memory_size) VALUES ('Test Agent', 10)"))
+            conn.commit()
+            
+            # Get agent ID
+            result = conn.execute(text("SELECT id FROM agents WHERE name = 'Test Agent'"))
+            agent_id = result.fetchone()[0]
+        
+        # Insert the myth to agent's memory
+        myth_id = insert_myth_to_agent_memory(
+            agent_id=agent_id,
+            myth_matrix=myth_matrix,
+            embedding_ids=embedding_ids
+        )
+        
+        # Verify the myth was created
+        assert myth_id > 0, "Myth ID should be positive"
+        
+        # Verify the myth exists in the myths table
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT id FROM myths WHERE id = :myth_id"), {"myth_id": myth_id})
+            myth_exists = result.fetchone() is not None
+            assert myth_exists, "Myth should exist in myths table"
+            
+            # Verify the agent_myths entry was created
+            result = conn.execute(text("""
+                SELECT myth_id, agent_id, retention 
+                FROM agent_myths 
+                WHERE myth_id = :myth_id AND agent_id = :agent_id
+            """), {"myth_id": myth_id, "agent_id": agent_id})
+            
+            row = result.fetchone()
+            assert row is not None, "Agent_myths entry should exist"
+            assert row[0] == myth_id, "Myth ID should match"
+            assert row[1] == agent_id, "Agent ID should match"
+            assert row[2] == 1.0, "Retention should be 1.0"
+            
+            # Verify position was assigned by trigger
+            result = conn.execute(text("""
+                SELECT position 
+                FROM agent_myths 
+                WHERE myth_id = :myth_id AND agent_id = :agent_id
+            """), {"myth_id": myth_id, "agent_id": agent_id})
+            
+            position = result.fetchone()[0]
+            assert position == 1, "Position should be 1 for first myth"
+    
+    @pytest.mark.integration
+    def test_insert_myth_to_agent_memory_with_custom_embedding(self):
+        """Test inserting a myth to an agent's memory with a custom embedding."""
+        # Create test data
+        embedding_dim = 4
+        num_mythemes = 2
+        
+        # Create a simple myth matrix
+        embeddings = np.random.rand(num_mythemes, embedding_dim).astype(np.float32)
+        offsets = np.random.rand(num_mythemes, embedding_dim).astype(np.float32)
+        weights = np.random.rand(num_mythemes).astype(np.float32)
+        
+        # Compose myth matrix
+        from mythicalgebra import compose_myth_matrix
+        myth_matrix = compose_myth_matrix(embeddings, offsets, weights)
+        
+        # Create custom embedding
+        custom_embedding = np.random.rand(embedding_dim).astype(np.float32)
+        
+        # Create embedding IDs
+        embedding_ids = [4, 5]
+        
+        # Insert an agent first
+        engine = get_engine()
+        with engine.connect() as conn:
+            conn.execute(text("INSERT INTO agents (name, memory_size) VALUES ('Test Agent 2', 10)"))
+            conn.commit()
+            
+            # Get agent ID
+            result = conn.execute(text("SELECT id FROM agents WHERE name = 'Test Agent 2'"))
+            agent_id = result.fetchone()[0]
+        
+        # Insert the myth to agent's memory with custom embedding
+        myth_id = insert_myth_to_agent_memory(
+            agent_id=agent_id,
+            myth_matrix=myth_matrix,
+            embedding_ids=embedding_ids,
+            embedding=custom_embedding
+        )
+        
+        # Verify the myth was created with the custom embedding
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT embedding FROM myths WHERE id = :myth_id"), {"myth_id": myth_id})
+            stored_embedding = result.fetchone()[0]
+            
+            # Convert to numpy for comparison
+            stored_embedding = np.array(stored_embedding)
+            np.testing.assert_array_almost_equal(stored_embedding, custom_embedding, decimal=6) 

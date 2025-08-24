@@ -12,10 +12,14 @@ from .myth_store import (
 )
 from .mythicalgebra.mythic_algebra_connector import (
     get_myth_embeddings,
-    get_myth_matrices,
+    get_myth_matrices_and_embedding_ids,
     recalc_and_update_myths,
 )
 from .agent_attributes_def_store import insert_agent_attribute_defs
+from .agent_atributes_matrix_store import (
+    get_agent_attribute_matrix,
+    update_agent_attribute_matrix,
+)
 from .status import (
     get_current_epoch,
     increment_epoch,
@@ -37,8 +41,22 @@ from .events_store import (
     get_next_event,
     set_event_triggered,
 )
+from .memory_store import (
+    get_myth_ids_and_retention_from_agents_memory,
+)
 # Import mythicalgebra subpackage
 from . import mythicalgebra
+# Import agent store
+from .agent_store import (
+    get_agents_bulk,
+    get_agent_cultures,
+    get_agents_cultures_bulk,
+)
+
+from .agent_atributes_matrix_store import (
+    get_agent_attribute_matrix,
+    update_agent_attribute_matrix,
+)
 
 __all__ = [
     # Mytheme functions
@@ -56,10 +74,13 @@ __all__ = [
     "delete_myths_bulk",
     # Myth algebra functions
     "get_myth_embeddings",
-    "get_myth_matrices",
+    "get_myth_matrices_and_embedding_ids",
     "recalc_and_update_myths",
     # Agent attribute defs
     "insert_agent_attribute_defs",
+    # Agent attributes matrix
+    "get_agent_attribute_matrix",
+    "update_agent_attribute_matrix",
     # Status functions
     "get_current_epoch",
     "increment_epoch",
@@ -80,4 +101,13 @@ __all__ = [
     "insert_event",
     "get_next_event",
     "set_event_triggered",
+    # Memory functions
+    "get_myth_ids_and_retention_from_agents_memory",
+    # Agent store
+    "get_agents_bulk",
+    "get_agent_cultures",
+    "get_agents_cultures_bulk",
+    # Agent attributes matrix
+    "get_agent_attribute_matrix",
+    "update_agent_attribute_matrix",
 ]
