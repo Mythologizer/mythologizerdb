@@ -29,7 +29,7 @@ from mythicalgebra import (
     compute_myth_embedding,
 )
 
-from mythologizer_postgres.db import get_engine
+from mythologizer_postgres.db import get_engine, session_scope
 from sqlalchemy import text
 
 
@@ -61,21 +61,50 @@ def create_test_embedding(base_values, embedding_dim):
 class TestMythicAlgebraConnector:
     """Test the mythic_algebra_connector module with real database operations."""
     
-    @pytest.fixture(autouse=True)
-    def cleanup_database(self):
-        """Clean up the database before each test."""
+    def setup_method(self):
+        """Clean up before each test method."""
         from mythologizer_postgres.db import clear_all_rows
-        # Clean up before test
         try:
             clear_all_rows()
         except Exception:
             pass
-        yield
-        # Clean up after test
+
+    def teardown_method(self):
+        """Clean up after each test method."""
+        from mythologizer_postgres.db import clear_all_rows
         try:
             clear_all_rows()
         except Exception:
             pass
+
+    def _create_test_agent(self, name: str = "Test Agent", memory_size: int = 10) -> int:
+        """Helper method to create a test agent."""
+        with session_scope() as session:
+            result = session.execute(text("""
+                INSERT INTO agents (name, memory_size)
+                VALUES (:name, :memory_size)
+                RETURNING id
+            """), {"name": name, "memory_size": memory_size})
+            return result.fetchone()[0]
+
+    def _create_test_myth(self, embedding_dim: int = 4) -> int:
+        """Helper method to create a test myth."""
+        with session_scope() as session:
+            embedding = np.random.rand(embedding_dim).tolist()
+            result = session.execute(text("""
+                INSERT INTO myths (embedding, embedding_ids, offsets, weights) 
+                VALUES (:embedding, ARRAY[1], ARRAY[]::vector[], ARRAY[]::double precision[])
+                RETURNING id
+            """), {"embedding": embedding})
+            return result.fetchone()[0]
+
+    def _insert_agent_myth(self, myth_id: int, agent_id: int, position: int, retention: float):
+        """Helper method to insert an agent_myth relationship."""
+        with session_scope() as session:
+            session.execute(text("""
+                INSERT INTO agent_myths (myth_id, agent_id, position, retention)
+                VALUES (:myth_id, :agent_id, :position, :retention)
+            """), {"myth_id": myth_id, "agent_id": agent_id, "position": position, "retention": retention})
     
     @pytest.mark.integration
     def test_mythicalgebra_package_functions(self):
@@ -701,7 +730,7 @@ class TestMythicAlgebraConnector:
             """), {"myth_id": myth_id, "agent_id": agent_id})
             
             position = result.fetchone()[0]
-            assert position == 1, "Position should be 1 for first myth"
+            assert position == 0, "Position should be 0 for first myth"
     
     @pytest.mark.integration
     def test_insert_myth_to_agent_memory_with_custom_embedding(self):
@@ -751,3 +780,42 @@ class TestMythicAlgebraConnector:
             # Convert to numpy for comparison
             stored_embedding = np.array(stored_embedding)
             np.testing.assert_array_almost_equal(stored_embedding, custom_embedding, decimal=6) 
+
+    def test_update_myth_with_retention(self):
+        """Test the update_myth_with_retention function."""
+        from mythologizer_postgres.connectors.mythicalgebra import update_myth_with_retention
+        from mythologizer_postgres.connectors.memory_store import get_myth_ids_and_retention_from_agents_memory
+        
+        # Create test agent and myth
+        agent_id = self._create_test_agent()
+        myth_id = self._create_test_myth()
+        
+        # Insert myth into agent's memory
+        self._insert_agent_myth(myth_id, agent_id, 1, 0.5)
+        
+        # Create a new myth matrix
+        embedding_dim = get_embedding_dim()
+        N = 2  # Number of mythemes
+        embeddings = np.random.rand(N, embedding_dim).astype(np.float32)
+        offsets = np.random.rand(N, embedding_dim).astype(np.float32)
+        weights = np.random.rand(N).astype(np.float32)
+        myth_matrix = compose_myth_matrix(embeddings, offsets, weights)
+        embedding_ids = [1, 2]
+        new_retention = 0.9
+        
+        # Update the myth with new retention
+        success = update_myth_with_retention(
+            agent_id=agent_id,
+            myth_id=myth_id,
+            myth_matrix=myth_matrix,
+            embedding_ids=embedding_ids,
+            retention=new_retention
+        )
+        
+        assert success, "Update should succeed"
+        
+        # Check that the retention was updated and position was recalculated
+        myth_ids, retentions = get_myth_ids_and_retention_from_agents_memory(agent_id)
+        assert len(myth_ids) == 1, "Should have one myth"
+        assert myth_ids[0] == myth_id, "Should be the same myth"
+        assert retentions[0] == new_retention, "Retention should be updated" 

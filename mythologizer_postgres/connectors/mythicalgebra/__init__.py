@@ -3,6 +3,7 @@ from .mythic_algebra_connector import (
     get_myth_embeddings,
     get_myth_matrices_and_embedding_ids,
     recalc_and_update_myths,
+    update_myth_with_retention,
 )
 from ..myth_store import get_myth, get_myths_bulk, update_myth, update_myths_bulk
 from ..mytheme_store import get_mythemes_bulk
@@ -29,6 +30,7 @@ __all__ = [
     "get_myth_embeddings",
     "get_myth_matrices_and_embedding_ids",
     "recalc_and_update_myths",
+    "update_myth_with_retention",
     "decompose_myth_matrix",
     "compose_myth_matrix",
     "compute_myth_embedding",

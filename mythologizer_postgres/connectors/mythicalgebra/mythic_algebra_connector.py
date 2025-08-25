@@ -288,3 +288,63 @@ def recalc_and_update_myths(
             raise ValueError("myth_data must be a list of tuples (id, matrix) or list of integers (myth_ids)")
     else:
         raise ValueError("myth_data must be a numpy array, list of tuples, or list of integers")
+
+
+def update_myth_with_retention(
+    agent_id: int,
+    myth_id: int,
+    myth_matrix: NDArray[np.floating],
+    embedding_ids: List[int],
+    retention: float,
+    embedding: Optional[NDArray[np.floating]] = None
+) -> bool:
+    """
+    Update a myth with new matrix data and update the agent_myths table with new retention.
+    
+    Args:
+        agent_id: The ID of the agent
+        myth_id: The ID of the myth to update
+        myth_matrix: The myth matrix to update
+        embedding_ids: List of embedding IDs
+        retention: The retention value for the agent_myths table
+        embedding: Optional embedding to use instead of computing from matrix
+    
+    Returns:
+        True if myth was updated successfully, False otherwise
+    """
+    from ..myth_store import update_myth as update_myth_store
+    from ..agent_store import update_agent_myth_retention
+    
+    # Decompose the matrix
+    embeddings, offsets, weights = decompose_myth_matrix(myth_matrix)
+    
+    # Compute main embedding (use provided embedding if available)
+    if embedding is not None:
+        main_embedding = embedding
+    else:
+        main_embedding = compute_myth_embedding(myth_matrix)
+    
+    # Update the myth
+    success = update_myth_store(
+        myth_id=myth_id,
+        main_embedding=main_embedding,
+        embedding_ids=embedding_ids,
+        offsets=offsets,
+        weights=weights
+    )
+    
+    if not success:
+        return False
+    
+    # Update the retention in agent_myths table
+    update_success = update_agent_myth_retention(agent_id, myth_id, retention)
+    
+    if update_success:
+        # Manually trigger retention-based position recalculation
+        from mythologizer_postgres.db import psycopg_connection
+        with psycopg_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT recalculate_agent_myth_positions_by_retention(%s)", (agent_id,))
+                conn.commit()
+    
+    return update_success

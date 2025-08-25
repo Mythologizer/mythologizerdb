@@ -100,11 +100,12 @@ class TestMemoryStore:
         assert len(retrieved_myth_ids) == 3, "Should return 3 myth IDs"
         assert len(retrieved_retentions) == 3, "Should return 3 retention values"
         
-        # Should be ordered by position (ASC)
-        # The trigger assigns positions based on insertion order, so the last inserted should be at position 3
-        assert retrieved_myth_ids[0] == myth_ids[0], "First myth should be the first inserted"
-        assert retrieved_myth_ids[1] == myth_ids[1], "Second myth should be the second inserted"
-        assert retrieved_myth_ids[2] == myth_ids[2], "Third myth should be the third inserted"
+        # Should be ordered by insertion order (stack behavior - last inserted first)
+        # Retentions: myth_ids[0]=0.8, myth_ids[1]=0.9, myth_ids[2]=0.7
+        # Expected order: 0.7 (last inserted), 0.9 (second inserted), 0.8 (first inserted)
+        assert retrieved_myth_ids[0] == myth_ids[2], "Last inserted myth (0.7) should be first"
+        assert retrieved_myth_ids[1] == myth_ids[1], "Second inserted myth (0.9) should be second"
+        assert retrieved_myth_ids[2] == myth_ids[0], "First inserted myth (0.8) should be third"
         
         # Check that retentions correspond to the correct myths
         # We need to check the actual retention values from the database
@@ -163,7 +164,7 @@ class TestMemoryStore:
             conn.execute(text("""
                 INSERT INTO agent_myths (myth_id, agent_id, position, retention) 
                 VALUES (:myth_id, :agent_id, :position, :retention)
-            """), {"myth_id": myth_id, "agent_id": agent_id, "position": 1, "retention": 0.85})
+            """), {"myth_id": myth_id, "agent_id": agent_id, "position": 0, "retention": 0.85})
             
             conn.commit()
         
@@ -224,28 +225,51 @@ class TestMemoryStore:
                 if i < 3:  # First 3 insertions - memory not full yet
                     expected_count = i + 1
                     assert len(retrieved_myth_ids) == expected_count, f"After inserting myth {i+1}, should have {expected_count} myths"
-                    
-                    # Should be in insertion order (bottom to top)
-                    for j in range(expected_count):
-                        assert retrieved_myth_ids[j] == myth_ids[j], f"Myth at position {j+1} should be myth {j+1}"
-                        assert retrieved_retentions[j] == retentions[j], f"Retention at position {j+1} should be {retentions[j]}"
+
+                    # Should be ordered by insertion order (last inserted first)
+                    # Retentions: [0.1, 0.2, 0.3, 0.4, 0.5]
+                    # After 3 insertions: [0.3, 0.2, 0.1] (last inserted first)
+                    if i == 0:  # After first insertion
+                        assert retrieved_myth_ids[0] == myth_ids[0], f"After inserting myth 1, should have myth 1 first"
+                        assert retrieved_retentions[0] == retentions[0], f"Retention at position 0 should be {retentions[0]}"
+                    elif i == 1:  # After second insertion
+                        assert retrieved_myth_ids[0] == myth_ids[1], f"After inserting myth 2, myth 2 (last inserted) should be first"
+                        assert retrieved_myth_ids[1] == myth_ids[0], f"After inserting myth 2, myth 1 (first inserted) should be second"
+                        assert retrieved_retentions[0] == retentions[1], f"Retention at position 0 should be {retentions[1]}"
+                        assert retrieved_retentions[1] == retentions[0], f"Retention at position 1 should be {retentions[0]}"
+                    elif i == 2:  # After third insertion
+                        assert retrieved_myth_ids[0] == myth_ids[2], f"After inserting myth 3, myth 3 (last inserted) should be first"
+                        assert retrieved_myth_ids[1] == myth_ids[1], f"After inserting myth 3, myth 2 (second inserted) should be second"
+                        assert retrieved_myth_ids[2] == myth_ids[0], f"After inserting myth 3, myth 1 (first inserted) should be third"
+                        assert retrieved_retentions[0] == retentions[2], f"Retention at position 0 should be {retentions[2]}"
+                        assert retrieved_retentions[1] == retentions[1], f"Retention at position 1 should be {retentions[1]}"
+                        assert retrieved_retentions[2] == retentions[0], f"Retention at position 2 should be {retentions[0]}"
                 
                 else:  # 4th and 5th insertions - eviction should occur
                     assert len(retrieved_myth_ids) == 3, f"After inserting myth {i+1}, should still have only 3 myths (capacity limit)"
                     
-                    # The bottom myth should have been evicted, so we should have the last 3 myths
-                    expected_start_idx = i - 2  # For i=3: myths 1,2,3. For i=4: myths 2,3,4
-                    for j in range(3):
-                        expected_myth_idx = expected_start_idx + j
-                        assert retrieved_myth_ids[j] == myth_ids[expected_myth_idx], f"After eviction, position {j+1} should have myth {expected_myth_idx+1}"
-                        assert retrieved_retentions[j] == retentions[expected_myth_idx], f"After eviction, position {j+1} should have retention {retentions[expected_myth_idx]}"
+                    # With stack behavior, the oldest myths (highest position) should be evicted
+                    # After 4 insertions: should have myths 4, 3, 2 (last 3 inserted)
+                    # After 5 insertions: should have myths 5, 4, 3 (last 3 inserted)
+                    if i == 3:  # After 4th insertion
+                        # Should have myths 4, 3, 2 (last 3 inserted)
+                        assert retrieved_myth_ids[0] == myth_ids[3], f"After 4th insertion, myth 4 (last inserted) should be first"
+                        assert retrieved_myth_ids[1] == myth_ids[2], f"After 4th insertion, myth 3 (third inserted) should be second"
+                        assert retrieved_myth_ids[2] == myth_ids[1], f"After 4th insertion, myth 2 (second inserted) should be third"
+                    elif i == 4:  # After 5th insertion
+                        # Should have myths 5, 4, 3 (last 3 inserted)
+                        assert retrieved_myth_ids[0] == myth_ids[4], f"After 5th insertion, myth 5 (last inserted) should be first"
+                        assert retrieved_myth_ids[1] == myth_ids[3], f"After 5th insertion, myth 4 (fourth inserted) should be second"
+                        assert retrieved_myth_ids[2] == myth_ids[2], f"After 5th insertion, myth 3 (third inserted) should be third"
         
-        # Final verification: should have myths 3, 4, 5 (the last 3 inserted)
+        # Final verification: should have myths 5, 4, 3 (last 3 inserted - stack behavior)
         final_myth_ids, final_retentions = get_myth_ids_and_retention_from_agents_memory(agent_id)
         
         assert len(final_myth_ids) == 3, "Final memory should have exactly 3 myths"
-        assert final_myth_ids == myth_ids[2:5], "Final memory should contain the last 3 inserted myths"
-        assert final_retentions == retentions[2:5], "Final retentions should match the last 3 inserted myths"
+        expected_final_myths = [myth_ids[4], myth_ids[3], myth_ids[2]]  # Last 3 inserted (stack behavior)
+        expected_final_retentions = [retentions[4], retentions[3], retentions[2]]  # Last 3 inserted
+        assert final_myth_ids == expected_final_myths, "Final memory should contain the last 3 inserted myths (stack behavior)"
+        assert final_retentions == expected_final_retentions, "Final retentions should match the last 3 inserted myths"
         
         # Verify the positions are correct (1, 2, 3)
         with engine.connect() as conn:
@@ -260,9 +284,11 @@ class TestMemoryStore:
             assert len(db_data) == 3, "Database should have exactly 3 myths"
             
             for i, (myth_id, position, retention) in enumerate(db_data):
-                assert position == i + 1, f"Position should be {i + 1}, got {position}"
-                assert myth_id == myth_ids[i + 2], f"Myth at position {i + 1} should be myth {i + 3}"
-                assert retention == retentions[i + 2], f"Retention at position {i + 1} should be {retentions[i + 2]}"
+                assert position == i, f"Position should be {i}, got {position}"
+                # Should be ordered by insertion order: myths 5, 4, 3 (last 3 inserted)
+                expected_myth_idx = 4 - i  # 4, 3, 2 (myths 5, 4, 3)
+                assert myth_id == myth_ids[expected_myth_idx], f"Myth at position {i} should be myth {expected_myth_idx + 1}"
+                assert retention == retentions[expected_myth_idx], f"Retention at position {i + 1} should be {retentions[expected_myth_idx]}"
 
     @pytest.mark.integration 
     def test_get_myth_ids_and_retention_stack_ordering_verification(self):
@@ -310,11 +336,12 @@ class TestMemoryStore:
         assert len(retrieved_myth_ids) == 4, "Should have 4 myths"
         assert len(retrieved_retentions) == 4, "Should have 4 retentions"
         
-        # Verify the order is bottom to top (position 1, 2, 3, 4)
-        # This means first inserted myth should be at position 1 (bottom)
-        # and last inserted myth should be at position 4 (top)
-        assert retrieved_myth_ids == myth_ids, "Myths should be in insertion order (bottom to top)"
-        assert retrieved_retentions == retentions, "Retentions should be in insertion order (bottom to top)"
+        # Verify the order is by insertion order (last inserted first)
+        # Retentions: [0.10, 0.20, 0.30, 0.40] - should be ordered as [0.40, 0.30, 0.20, 0.10] (last inserted first)
+        expected_order = [myth_ids[3], myth_ids[2], myth_ids[1], myth_ids[0]]  # Last to first inserted
+        assert retrieved_myth_ids == expected_order, "Myths should be ordered by insertion order (last inserted first)"
+        expected_retentions = [retentions[3], retentions[2], retentions[1], retentions[0]]  # Last to first inserted
+        assert retrieved_retentions == expected_retentions, "Retentions should be ordered by insertion order (last inserted first)"
         
         # Double-check by querying database directly
         with engine.connect() as conn:
@@ -328,9 +355,11 @@ class TestMemoryStore:
             db_data = result.fetchall()
             
             for i, (db_myth_id, db_position, db_retention) in enumerate(db_data):
-                assert db_position == i + 1, f"Database position should be {i + 1}"
-                assert db_myth_id == myth_ids[i], f"Database myth at position {i + 1} should match"
-                assert db_retention == retentions[i], f"Database retention at position {i + 1} should match"
+                assert db_position == i, f"Database position should be {i}"
+                # Should be ordered by insertion order: myths 4, 3, 2, 1 (last inserted first)
+                expected_myth_idx = 3 - i  # 3, 2, 1, 0 (myths 4, 3, 2, 1)
+                assert db_myth_id == myth_ids[expected_myth_idx], f"Database myth at position {i} should be myth {expected_myth_idx + 1}"
+                assert db_retention == retentions[expected_myth_idx], f"Database retention at position {i} should be {retentions[expected_myth_idx]}"
                 assert db_myth_id == retrieved_myth_ids[i], "Function result should match database"
                 assert db_retention == retrieved_retentions[i], "Function retention should match database"
     
@@ -387,13 +416,15 @@ class TestMemoryStore:
             db_data = result.fetchall()
             print(f"Database positions: {[(row[0], row[1], row[2]) for row in db_data]}")
             
-            # Expected: myth_ids[0] at position 1, myth_ids[1] at position 2, myth_ids[2] at position 3
-            assert db_data[0][0] == myth_ids[0], "First inserted myth should be at position 1 (bottom)"
-            assert db_data[0][1] == 1, "First myth should have position 1"
-            assert db_data[1][0] == myth_ids[1], "Second inserted myth should be at position 2"
-            assert db_data[1][1] == 2, "Second myth should have position 2"
-            assert db_data[2][0] == myth_ids[2], "Third inserted myth should be at position 3 (top)"
-            assert db_data[2][1] == 3, "Third myth should have position 3"
+            # Expected: ordered by insertion order (last inserted first)
+            # Insertion order: myth_ids[0]=0.8, myth_ids[1]=0.9, myth_ids[2]=0.7
+            # Expected order: 0.7, 0.9, 0.8 (last inserted first)
+            assert db_data[0][0] == myth_ids[2], "Last inserted myth (0.7) should be at position 0"
+            assert db_data[0][1] == 0, "Last inserted myth should have position 0"
+            assert db_data[1][0] == myth_ids[1], "Second inserted myth (0.9) should be at position 1"
+            assert db_data[1][1] == 1, "Second inserted myth should have position 1"
+            assert db_data[2][0] == myth_ids[0], "First inserted myth (0.8) should be at position 2"
+            assert db_data[2][1] == 2, "First inserted myth should have position 2"
         
         # Get memory using our function
         retrieved_myth_ids, retrieved_retentions = get_myth_ids_and_retention_from_agents_memory(agent_id)
@@ -402,15 +433,15 @@ class TestMemoryStore:
         assert len(retrieved_myth_ids) == 3, "Should return 3 myth IDs"
         assert len(retrieved_retentions) == 3, "Should return 3 retention values"
         
-        # Stack order: position 1 (bottom/oldest) to position 3 (top/newest)
-        assert retrieved_myth_ids[0] == myth_ids[0], "First in result should be myth at position 1 (bottom)"
-        assert retrieved_myth_ids[1] == myth_ids[1], "Second in result should be myth at position 2 (middle)"
-        assert retrieved_myth_ids[2] == myth_ids[2], "Third in result should be myth at position 3 (top)"
+        # Stack order: last inserted first
+        assert retrieved_myth_ids[0] == myth_ids[2], "First in result should be last inserted myth (0.7)"
+        assert retrieved_myth_ids[1] == myth_ids[1], "Second in result should be second inserted myth (0.9)"
+        assert retrieved_myth_ids[2] == myth_ids[0], "Third in result should be first inserted myth (0.8)"
         
-        # Verify retentions match
-        assert retrieved_retentions[0] == retentions[0], "First retention should match"
-        assert retrieved_retentions[1] == retentions[1], "Second retention should match"
-        assert retrieved_retentions[2] == retentions[2], "Third retention should match"
+        # Verify retentions match (ordered by insertion)
+        assert retrieved_retentions[0] == retentions[2], "First retention should be last inserted (0.7)"
+        assert retrieved_retentions[1] == retentions[1], "Second retention should be second inserted (0.9)"
+        assert retrieved_retentions[2] == retentions[0], "Third retention should be first inserted (0.8)"
         
         print(f"Function returned (bottom to top): {list(zip(retrieved_myth_ids, retrieved_retentions))}")
     
@@ -474,7 +505,7 @@ class TestMemoryStore:
         # A) Stack order (bottom to top): oldest first, newest last - ORDER BY position ASC
         # B) Queue order (front to back): newest first, oldest last - ORDER BY position DESC
         
-        # Based on schema comments, this is a STACK with position 1 = bottom (oldest)
-        # So stack order (A) should be correct: oldest myths first
-        assert retrieved_myth_ids[0] == myth_ids[0], "Oldest myth should be first (position 1, bottom of stack)"
-        assert retrieved_myth_ids[2] == myth_ids[2], "Newest myth should be last (position 3, top of stack)"
+        # Based on stack behavior, myths are ordered by insertion order (last inserted first)
+        # Insertion order: [0.5, 0.6, 0.7] - should be ordered as [0.7, 0.6, 0.5] (last inserted first)
+        assert retrieved_myth_ids[0] == myth_ids[2], "Last inserted myth (0.7) should be first"
+        assert retrieved_myth_ids[2] == myth_ids[0], "First inserted myth (0.5) should be last"

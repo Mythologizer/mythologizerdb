@@ -202,7 +202,7 @@ class TestAgentMythsSchema:
                 'myth_id': myth_id
             })
             position = result.fetchone()[0]
-            assert position == 1, "Trigger should assign position 1 for first myth"
+            assert position == 0, "Trigger should assign position 0 for first myth"
         
         # Clean up
         clear_all_rows()

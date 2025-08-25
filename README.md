@@ -96,6 +96,7 @@ from mythologizer_postgres.connectors import (
     get_myth_embeddings,
     get_myth_matrices,
     recalc_and_update_myths,
+    update_myth_with_retention,
 )
 
 # Example: Get a myth by ID
@@ -110,6 +111,7 @@ from mythologizer_postgres.connectors.mythicalgebra import (
     get_myth_embeddings,
     get_myth_matrices,
     recalc_and_update_myths,
+    update_myth_with_retention,
 )
 
 # Example: Get myth embeddings
@@ -120,6 +122,19 @@ matrices = get_myth_matrices([123, 124, 125])
 
 # Example: Recalculate and update myths
 updated_ids = recalc_and_update_myths([123, 124, 125])
+
+# Example: Update myth with retention
+success = update_myth_with_retention(
+    agent_id=456,
+    myth_id=123,
+    myth_matrix=myth_matrix,
+    embedding_ids=[1, 2],
+    retention=0.9
+)
+
+# Example: Manually trigger retention-based reordering
+from mythologizer_postgres.connectors import recalculate_agent_myth_positions_by_retention
+success = recalculate_agent_myth_positions_by_retention(agent_id=456)
 ```
 
 ### Subpackage Access

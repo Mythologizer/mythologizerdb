@@ -92,7 +92,7 @@ class TestAgentMythsComprehensive:
                 'myth_id': myth_id
             })
             position = result.fetchone()[0]
-            assert position == 1, "First myth should get position 1 (bottom of stack)"
+            assert position == 0, "First myth should get position 0 (top of stack)"
         
         # Clean up
         clear_all_rows()
@@ -155,9 +155,9 @@ class TestAgentMythsComprehensive:
             positions = result.fetchall()
             
             assert len(positions) == 3, "Should have 3 myths"
-            assert positions[0][1] == 1, "First myth should be at position 1 (bottom)"
-            assert positions[1][1] == 2, "Second myth should be at position 2"
-            assert positions[2][1] == 3, "Third myth should be at position 3 (top)"
+            assert positions[0][1] == 0, "First myth should be at position 0 (top)"
+            assert positions[1][1] == 1, "Second myth should be at position 1"
+            assert positions[2][1] == 2, "Third myth should be at position 2 (bottom)"
             
             # Now insert a 4th myth - should evict the bottom one (position 1)
             embedding = np.random.rand(embedding_dim).tolist()
@@ -214,7 +214,7 @@ class TestAgentMythsComprehensive:
                 'myth_id': new_myth_id
             })
             new_myth_position = result.fetchone()[0]
-            assert new_myth_position == 3, "New myth should be at top position"
+            assert new_myth_position == 0, "New myth should be at top position"
         
         # Clean up
         clear_all_rows()
@@ -360,7 +360,7 @@ class TestAgentMythsComprehensive:
             count_after = result.fetchone()[0]
             assert count_after == 3, "Should have 3 myths after reducing memory_size"
             
-            # Verify positions are still contiguous starting from 1
+            # Verify positions are still contiguous starting from 0
             result = session.execute(text("""
                 SELECT position FROM agent_myths 
                 WHERE agent_id = :agent_id 
@@ -369,7 +369,7 @@ class TestAgentMythsComprehensive:
                 'agent_id': agent_id
             })
             positions = [row[0] for row in result.fetchall()]
-            assert positions == [1, 2, 3], "Positions should be contiguous 1, 2, 3"
+            assert positions == [0, 1, 2], "Positions should be contiguous 0, 1, 2"
             
             # Test reducing to minimum allowed value (3) - should keep top 3
             session.execute(text("""

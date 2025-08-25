@@ -2,7 +2,7 @@
 Agent store implementation for managing agents.
 """
 
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from mythologizer_postgres.db import psycopg_connection
 
 
@@ -114,3 +114,104 @@ def get_agents_cultures_bulk(agent_ids: List[int]) -> List[List[Tuple[int, str, 
                     result.append([])
             
             return result
+
+
+def get_agent_myth(agent_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Get the agent_myth entry for a specific agent.
+    
+    Args:
+        agent_id: The ID of the agent
+        
+    Returns:
+        Dictionary containing agent_myth data or None if not found
+    """
+    with psycopg_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT myth_id, agent_id, position, retention
+                FROM agent_myths
+                WHERE agent_id = %s
+                LIMIT 1
+            """, (agent_id,))
+            
+            row = cur.fetchone()
+            if row:
+                return {
+                    'myth_id': row[0],
+                    'agent_id': row[1],
+                    'position': row[2],
+                    'retention': row[3]
+                }
+            return None
+
+
+def insert_agent_myth(myth_id: int, agent_id: int, position: int, retention: float) -> bool:
+    """
+    Insert a new agent_myth entry.
+    
+    Args:
+        myth_id: The ID of the myth
+        agent_id: The ID of the agent
+        position: The position
+        retention: The retention value
+        
+    Returns:
+        True if inserted successfully, False otherwise
+    """
+    with psycopg_connection() as conn:
+        with conn.cursor() as cur:
+            try:
+                cur.execute("""
+                    INSERT INTO agent_myths (myth_id, agent_id, position, retention)
+                    VALUES (%s, %s, %s, %s)
+                """, (myth_id, agent_id, position, retention))
+                conn.commit()
+                return True
+            except Exception:
+                conn.rollback()
+                return False
+
+
+def update_agent_myth_retention(agent_id: int, myth_id: int, retention: float) -> bool:
+    """
+    Update the retention value for an agent_myth entry.
+    
+    Args:
+        agent_id: The ID of the agent
+        myth_id: The ID of the myth
+        retention: The new retention value
+        
+    Returns:
+        True if updated successfully, False otherwise
+    """
+    with psycopg_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE agent_myths 
+                SET retention = %s
+                WHERE myth_id = %s AND agent_id = %s
+            """, (retention, myth_id, agent_id))
+            conn.commit()
+            return cur.rowcount > 0
+
+
+def recalculate_agent_myth_positions_by_retention(agent_id: int) -> bool:
+    """
+    Manually trigger retention-based position recalculation for an agent.
+    
+    Args:
+        agent_id: The ID of the agent
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    with psycopg_connection() as conn:
+        with conn.cursor() as cur:
+            try:
+                cur.execute("SELECT recalculate_agent_myth_positions_by_retention(%s)", (agent_id,))
+                conn.commit()
+                return True
+            except Exception:
+                conn.rollback()
+                return False

@@ -50,6 +50,16 @@ def get_cultures_bulk(
     return [(row[0], row[1], row[2]) for row in rows]
 
 
+def get_all_cultures() -> List[Tuple[int, str, str]]:
+    """
+    Get all cultures from the database.
+    
+    Returns:
+        List of tuples (id, name, description) ordered by name
+    """
+    return get_cultures_bulk()
+
+
 def get_culture(
     culture_id: int,
 ) -> Tuple[int, str, str]:
