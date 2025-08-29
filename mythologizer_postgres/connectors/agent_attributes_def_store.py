@@ -2,9 +2,26 @@ from typing import List, Optional, Sequence, Tuple, Mapping, Any, Union
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from mythologizer_postgres.db import get_engine
+from mythologizer_postgres.db import get_engine, psycopg_connection
 
 EngineT = Engine
+
+def get_agent_attribute_defs() -> List[Tuple[int, str, str, str, Optional[float], Optional[float], int]]:
+    """
+    Get all agent attribute definitions from the database.
+    
+    Returns:
+        List of tuples (id, name, description, atype, min_val, max_val, col_idx) ordered by col_idx
+    """
+    with psycopg_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, name, description, atype, min_val, max_val, col_idx
+                FROM agent_attribute_defs
+                ORDER BY col_idx
+            """)
+            return cur.fetchall()
+
 
 def insert_agent_attribute_defs(defs: Sequence[Union[Mapping[str, Any], Any]]) -> None:
     """

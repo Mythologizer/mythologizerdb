@@ -8,6 +8,7 @@ from mythologizer_postgres.db import (
     get_table_row_counts,
     clear_all_rows,
 )
+from mythologizer_postgres.connectors import insert_agent_myth_safe_with_session
 
 
 def get_embedding_dim():
@@ -184,16 +185,14 @@ class TestAgentMythsSchema:
             agent_result = session.execute(text("SELECT id FROM agents LIMIT 1"))
             agent_id = agent_result.fetchone()[0]
             
-            # Test valid insertion - let the trigger handle position assignment
-            session.execute(text("""
-                INSERT INTO agent_myths (myth_id, agent_id, position, retention) 
-                VALUES (:myth_id, :agent_id, :position, :retention)
-            """), {
-                'myth_id': myth_id,
-                'agent_id': agent_id,
-                'position': 1,  # This will be overridden by the trigger
-                'retention': 0.8
-            })
+            # Test valid insertion - use safe function instead of trigger
+            success = insert_agent_myth_safe_with_session(
+                session=session,
+                myth_id=myth_id,
+                agent_id=agent_id,
+                retention=0.8
+            )
+            assert success, f"Failed to insert myth {myth_id} into agent {agent_id}"
             
             # Verify the trigger worked
             result = session.execute(text("""
@@ -248,27 +247,22 @@ class TestAgentMythsSchema:
             agent_id = agent_result.fetchone()[0]
             
             # Insert first record
-            session.execute(text("""
-                INSERT INTO agent_myths (myth_id, agent_id, position, retention) 
-                VALUES (:myth_id, :agent_id, :position, :retention)
-            """), {
-                'myth_id': myth_ids[0],
-                'agent_id': agent_id,
-                'position': 1,
-                'retention': 0.8
-            })
+            success = insert_agent_myth_safe_with_session(
+                session=session,
+                myth_id=myth_ids[0],
+                agent_id=agent_id,
+                retention=0.8
+            )
+            assert success, f"Failed to insert myth {myth_ids[0]} into agent {agent_id}"
             
             # Test unique constraint violation (same myth_id - myth can only belong to one agent)
-            with pytest.raises(Exception):
-                session.execute(text("""
-                    INSERT INTO agent_myths (myth_id, agent_id, position, retention) 
-                    VALUES (:myth_id, :agent_id, :position, :retention)
-                """), {
-                    'myth_id': myth_ids[0],  # Same myth - should fail
-                    'agent_id': agent_id,
-                    'position': 2,
-                    'retention': 0.9
-                })
+            success = insert_agent_myth_safe_with_session(
+                session=session,
+                myth_id=myth_ids[0],  # Same myth - should fail
+                agent_id=agent_id,
+                retention=0.9
+            )
+            assert not success, "Should fail when inserting same myth twice"
         
         # Clean up
         clear_all_rows()

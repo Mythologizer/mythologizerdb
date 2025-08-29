@@ -75,21 +75,17 @@ class TestMemoryStore:
             result = conn.execute(text("SELECT id FROM myths ORDER BY id"))
             myth_ids = [row[0] for row in result.fetchall()]
             
-            # Insert agent myths (let triggers handle position assignment)
-            conn.execute(text("""
-                INSERT INTO agent_myths (myth_id, agent_id, position, retention) 
-                VALUES (:myth_id, :agent_id, :position, :retention)
-            """), {"myth_id": myth_ids[0], "agent_id": agent_id, "position": 1, "retention": 0.8})
+            # Insert agent myths using safe function
+            from mythologizer_postgres.connectors import insert_agent_myth_safe
             
-            conn.execute(text("""
-                INSERT INTO agent_myths (myth_id, agent_id, position, retention) 
-                VALUES (:myth_id, :agent_id, :position, :retention)
-            """), {"myth_id": myth_ids[1], "agent_id": agent_id, "position": 1, "retention": 0.9})
+            success1 = insert_agent_myth_safe(myth_id=myth_ids[0], agent_id=agent_id, retention=0.8)
+            assert success1, f"Failed to insert myth {myth_ids[0]} into agent {agent_id}"
             
-            conn.execute(text("""
-                INSERT INTO agent_myths (myth_id, agent_id, position, retention) 
-                VALUES (:myth_id, :agent_id, :position, :retention)
-            """), {"myth_id": myth_ids[2], "agent_id": agent_id, "position": 1, "retention": 0.7})
+            success2 = insert_agent_myth_safe(myth_id=myth_ids[1], agent_id=agent_id, retention=0.9)
+            assert success2, f"Failed to insert myth {myth_ids[1]} into agent {agent_id}"
+            
+            success3 = insert_agent_myth_safe(myth_id=myth_ids[2], agent_id=agent_id, retention=0.7)
+            assert success3, f"Failed to insert myth {myth_ids[2]} into agent {agent_id}"
             
             conn.commit()
         
@@ -100,12 +96,12 @@ class TestMemoryStore:
         assert len(retrieved_myth_ids) == 3, "Should return 3 myth IDs"
         assert len(retrieved_retentions) == 3, "Should return 3 retention values"
         
-        # Should be ordered by insertion order (stack behavior - last inserted first)
+        # Should be ordered by retention (highest retention first)
         # Retentions: myth_ids[0]=0.8, myth_ids[1]=0.9, myth_ids[2]=0.7
-        # Expected order: 0.7 (last inserted), 0.9 (second inserted), 0.8 (first inserted)
-        assert retrieved_myth_ids[0] == myth_ids[2], "Last inserted myth (0.7) should be first"
-        assert retrieved_myth_ids[1] == myth_ids[1], "Second inserted myth (0.9) should be second"
-        assert retrieved_myth_ids[2] == myth_ids[0], "First inserted myth (0.8) should be third"
+        # Expected order: 0.9 (highest), 0.8 (second), 0.7 (lowest)
+        assert retrieved_myth_ids[0] == myth_ids[1], "Highest retention myth (0.9) should be first"
+        assert retrieved_myth_ids[1] == myth_ids[0], "Second highest retention myth (0.8) should be second"
+        assert retrieved_myth_ids[2] == myth_ids[2], "Lowest retention myth (0.7) should be third"
         
         # Check that retentions correspond to the correct myths
         # We need to check the actual retention values from the database
@@ -160,11 +156,11 @@ class TestMemoryStore:
             result = conn.execute(text("SELECT id FROM myths"))
             myth_id = result.fetchone()[0]
             
-            # Insert with specific position and retention
-            conn.execute(text("""
-                INSERT INTO agent_myths (myth_id, agent_id, position, retention) 
-                VALUES (:myth_id, :agent_id, :position, :retention)
-            """), {"myth_id": myth_id, "agent_id": agent_id, "position": 0, "retention": 0.85})
+            # Insert with specific position and retention using safe function
+            from mythologizer_postgres.connectors import insert_agent_myth_safe
+            
+            success = insert_agent_myth_safe(myth_id=myth_id, agent_id=agent_id, retention=0.85)
+            assert success, f"Failed to insert myth {myth_id} into agent {agent_id}"
             
             conn.commit()
         
@@ -211,11 +207,15 @@ class TestMemoryStore:
                 myth_id = result.fetchone()[0]
                 myth_ids.append(myth_id)
                 
-                # Insert into agent memory - let trigger handle positioning
-                conn.execute(text("""
-                    INSERT INTO agent_myths (myth_id, agent_id, position, retention) 
-                    VALUES (:myth_id, :agent_id, 1, :retention)
-                """), {"myth_id": myth_id, "agent_id": agent_id, "retention": retentions[i]})
+                # Insert into agent memory using safe function
+                from mythologizer_postgres.connectors import insert_agent_myth_safe
+                
+                success = insert_agent_myth_safe(
+                    myth_id=myth_id,
+                    agent_id=agent_id,
+                    retention=retentions[i]
+                )
+                assert success, f"Failed to insert myth {myth_id} into agent {agent_id}"
                 
                 conn.commit()
                 
@@ -322,13 +322,15 @@ class TestMemoryStore:
                 myth_id = result.fetchone()[0]
                 myth_ids.append(myth_id)
                 
-                # Insert into agent memory
-                conn.execute(text("""
-                    INSERT INTO agent_myths (myth_id, agent_id, position, retention) 
-                    VALUES (:myth_id, :agent_id, 1, :retention)
-                """), {"myth_id": myth_id, "agent_id": agent_id, "retention": retentions[i]})
+                # Insert into agent memory - use safe function instead of trigger
+                from mythologizer_postgres.connectors import insert_agent_myth_safe
                 
-                conn.commit()
+                success = insert_agent_myth_safe(
+                    myth_id=myth_id,
+                    agent_id=agent_id,
+                    retention=retentions[i]
+                )
+                assert success, f"Failed to insert myth {myth_id} into agent {agent_id}"
         
         # Get memory and verify order
         retrieved_myth_ids, retrieved_retentions = get_myth_ids_and_retention_from_agents_memory(agent_id)
@@ -397,11 +399,15 @@ class TestMemoryStore:
             retentions = [0.8, 0.9, 0.7]  # Different retentions for each myth
             
             for myth_id, retention in zip(myth_ids, retentions):
-                # Insert with position=1, but trigger will override this
-                conn.execute(text("""
-                    INSERT INTO agent_myths (myth_id, agent_id, position, retention) 
-                    VALUES (:myth_id, :agent_id, 1, :retention)
-                """), {"myth_id": myth_id, "agent_id": agent_id, "retention": retention})
+                # Insert using safe function instead of trigger
+                from mythologizer_postgres.connectors import insert_agent_myth_safe
+                
+                success = insert_agent_myth_safe(
+                    myth_id=myth_id,
+                    agent_id=agent_id,
+                    retention=retention
+                )
+                assert success, f"Failed to insert myth {myth_id} into agent {agent_id}"
             
             conn.commit()
             
@@ -416,15 +422,15 @@ class TestMemoryStore:
             db_data = result.fetchall()
             print(f"Database positions: {[(row[0], row[1], row[2]) for row in db_data]}")
             
-            # Expected: ordered by insertion order (last inserted first)
-            # Insertion order: myth_ids[0]=0.8, myth_ids[1]=0.9, myth_ids[2]=0.7
-            # Expected order: 0.7, 0.9, 0.8 (last inserted first)
-            assert db_data[0][0] == myth_ids[2], "Last inserted myth (0.7) should be at position 0"
-            assert db_data[0][1] == 0, "Last inserted myth should have position 0"
-            assert db_data[1][0] == myth_ids[1], "Second inserted myth (0.9) should be at position 1"
-            assert db_data[1][1] == 1, "Second inserted myth should have position 1"
-            assert db_data[2][0] == myth_ids[0], "First inserted myth (0.8) should be at position 2"
-            assert db_data[2][1] == 2, "First inserted myth should have position 2"
+            # Expected: ordered by retention (highest retention first)
+            # Retentions: myth_ids[0]=0.8, myth_ids[1]=0.9, myth_ids[2]=0.7
+            # Expected order: 0.9, 0.8, 0.7 (highest retention first)
+            assert db_data[0][0] == myth_ids[1], "Highest retention myth (0.9) should be at position 0"
+            assert db_data[0][1] == 0, "Highest retention myth should have position 0"
+            assert db_data[1][0] == myth_ids[0], "Second highest retention myth (0.8) should be at position 1"
+            assert db_data[1][1] == 1, "Second highest retention myth should have position 1"
+            assert db_data[2][0] == myth_ids[2], "Lowest retention myth (0.7) should be at position 2"
+            assert db_data[2][1] == 2, "Lowest retention myth should have position 2"
         
         # Get memory using our function
         retrieved_myth_ids, retrieved_retentions = get_myth_ids_and_retention_from_agents_memory(agent_id)
@@ -433,15 +439,15 @@ class TestMemoryStore:
         assert len(retrieved_myth_ids) == 3, "Should return 3 myth IDs"
         assert len(retrieved_retentions) == 3, "Should return 3 retention values"
         
-        # Stack order: last inserted first
-        assert retrieved_myth_ids[0] == myth_ids[2], "First in result should be last inserted myth (0.7)"
-        assert retrieved_myth_ids[1] == myth_ids[1], "Second in result should be second inserted myth (0.9)"
-        assert retrieved_myth_ids[2] == myth_ids[0], "Third in result should be first inserted myth (0.8)"
+        # Retention-based order: highest retention first
+        assert retrieved_myth_ids[0] == myth_ids[1], "First in result should be highest retention myth (0.9)"
+        assert retrieved_myth_ids[1] == myth_ids[0], "Second in result should be second highest retention myth (0.8)"
+        assert retrieved_myth_ids[2] == myth_ids[2], "Third in result should be lowest retention myth (0.7)"
         
-        # Verify retentions match (ordered by insertion)
-        assert retrieved_retentions[0] == retentions[2], "First retention should be last inserted (0.7)"
-        assert retrieved_retentions[1] == retentions[1], "Second retention should be second inserted (0.9)"
-        assert retrieved_retentions[2] == retentions[0], "Third retention should be first inserted (0.8)"
+        # Verify retentions match (ordered by retention)
+        assert retrieved_retentions[0] == retentions[1], "First retention should be highest (0.9)"
+        assert retrieved_retentions[1] == retentions[0], "Second retention should be second highest (0.8)"
+        assert retrieved_retentions[2] == retentions[2], "Third retention should be lowest (0.7)"
         
         print(f"Function returned (bottom to top): {list(zip(retrieved_myth_ids, retrieved_retentions))}")
     
@@ -478,10 +484,15 @@ class TestMemoryStore:
             retentions = [0.5, 0.6, 0.7]  # Increasing retention for clarity
             
             for i, (myth_id, retention) in enumerate(zip(myth_ids, retentions)):
-                conn.execute(text("""
-                    INSERT INTO agent_myths (myth_id, agent_id, position, retention) 
-                    VALUES (:myth_id, :agent_id, 1, :retention)
-                """), {"myth_id": myth_id, "agent_id": agent_id, "retention": retention})
+                # Insert using safe function instead of trigger
+                from mythologizer_postgres.connectors import insert_agent_myth_safe
+                
+                success = insert_agent_myth_safe(
+                    myth_id=myth_id,
+                    agent_id=agent_id,
+                    retention=retention
+                )
+                assert success, f"Failed to insert myth {myth_id} into agent {agent_id}"
                 
                 # Check position after each insertion
                 result = conn.execute(text("""

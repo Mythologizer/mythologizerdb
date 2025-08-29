@@ -6,7 +6,7 @@ import pytest
 from typing import List, Dict, Any, Tuple
 from sqlalchemy import text
 
-from mythologizer_postgres.connectors.agent_store import get_agents_bulk, get_agent_cultures, get_agents_cultures_bulk
+from mythologizer_postgres.connectors.agent_store import get_agents_bulk, get_agent_cultures, get_agents_cultures_ids_bulk
 from mythologizer_postgres.db import clear_all_rows, session_scope
 
 
@@ -363,31 +363,31 @@ class TestAgentStore:
         assert culture[1] == 'Test Culture', "Culture name should match"
         assert culture[2] == 'A test culture', "Culture description should match"
 
-    # Tests for get_agents_cultures_bulk function
+    # Tests for get_agents_cultures_ids_bulk function
     @pytest.mark.integration
-    def test_get_agents_cultures_bulk_empty_list(self):
-        """Test get_agents_cultures_bulk with empty list."""
-        result = get_agents_cultures_bulk([])
+    def test_get_agents_cultures_ids_bulk_empty_list(self):
+        """Test get_agents_cultures_ids_bulk with empty list."""
+        result = get_agents_cultures_ids_bulk([])
         assert result == [], "Should return empty list for empty input"
 
     @pytest.mark.integration
-    def test_get_agents_cultures_bulk_single_agent_no_cultures(self):
-        """Test get_agents_cultures_bulk with single agent having no cultures."""
+    def test_get_agents_cultures_ids_bulk_single_agent_no_cultures(self):
+        """Test get_agents_cultures_ids_bulk with single agent having no cultures."""
         # Create a test agent
         agent_ids = self._create_test_agents([
             {'name': 'Test Agent', 'memory_size': 5}
         ])
         
-        # Get cultures in bulk
-        result = get_agents_cultures_bulk(agent_ids)
+        # Get culture IDs in bulk
+        result = get_agents_cultures_ids_bulk(agent_ids)
         
         # Verify result
         assert len(result) == 1, "Should return exactly one agent entry"
         assert result[0] == [], "Should return empty list for agent with no cultures"
 
     @pytest.mark.integration
-    def test_get_agents_cultures_bulk_single_agent_with_cultures(self):
-        """Test get_agents_cultures_bulk with single agent having cultures."""
+    def test_get_agents_cultures_ids_bulk_single_agent_with_cultures(self):
+        """Test get_agents_cultures_ids_bulk with single agent having cultures."""
         # Create test agent and cultures
         agent_ids = self._create_test_agents([
             {'name': 'Test Agent', 'memory_size': 5}
@@ -401,25 +401,21 @@ class TestAgentStore:
         relationships = [(agent_ids[0], culture_ids[0]), (agent_ids[0], culture_ids[1])]
         self._create_agent_culture_relationships(relationships)
         
-        # Get cultures in bulk
-        result = get_agents_cultures_bulk(agent_ids)
+        # Get culture IDs in bulk
+        result = get_agents_cultures_ids_bulk(agent_ids)
         
         # Verify result
         assert len(result) == 1, "Should return exactly one agent entry"
-        assert len(result[0]) == 2, "Should return exactly two cultures"
+        assert len(result[0]) == 2, "Should return exactly two culture IDs"
         
-        # Verify culture data
-        cultures = result[0]
-        assert cultures[0][0] == culture_ids[0], "First culture should have correct ID"
-        assert cultures[0][1] == 'Culture 1', "First culture should have correct name"
-        assert cultures[0][2] == 'First culture', "First culture should have correct description"
-        assert cultures[1][0] == culture_ids[1], "Second culture should have correct ID"
-        assert cultures[1][1] == 'Culture 2', "Second culture should have correct name"
-        assert cultures[1][2] == 'Second culture', "Second culture should have correct description"
+        # Verify culture IDs
+        culture_ids_result = result[0]
+        assert culture_ids[0] in culture_ids_result, "Should contain first culture ID"
+        assert culture_ids[1] in culture_ids_result, "Should contain second culture ID"
 
     @pytest.mark.integration
-    def test_get_agents_cultures_bulk_multiple_agents(self):
-        """Test get_agents_cultures_bulk with multiple agents."""
+    def test_get_agents_cultures_ids_bulk_multiple_agents(self):
+        """Test get_agents_cultures_ids_bulk with multiple agents."""
         # Create test agents and cultures
         agent_ids = self._create_test_agents([
             {'name': 'Agent 1', 'memory_size': 5},
@@ -439,27 +435,27 @@ class TestAgentStore:
         ]
         self._create_agent_culture_relationships(relationships)
         
-        # Get cultures in bulk
-        result = get_agents_cultures_bulk(agent_ids)
+        # Get culture IDs in bulk
+        result = get_agents_cultures_ids_bulk(agent_ids)
         
         # Verify result
         assert len(result) == 2, "Should return exactly two agent entries"
         
-        # Verify Agent 1 cultures (first element in result)
-        assert len(result[0]) == 2, "Agent 1 should have exactly two cultures"
-        agent1_cultures = result[0]
-        assert agent1_cultures[0][0] == culture_ids[0], "Agent 1 first culture should have correct ID"
-        assert agent1_cultures[1][0] == culture_ids[1], "Agent 1 second culture should have correct ID"
+        # Verify Agent 1 culture IDs (first element in result)
+        assert len(result[0]) == 2, "Agent 1 should have exactly two culture IDs"
+        agent1_culture_ids = result[0]
+        assert culture_ids[0] in agent1_culture_ids, "Agent 1 should contain first culture ID"
+        assert culture_ids[1] in agent1_culture_ids, "Agent 1 should contain second culture ID"
         
-        # Verify Agent 2 cultures (second element in result)
-        assert len(result[1]) == 1, "Agent 2 should have exactly one culture"
-        agent2_cultures = result[1]
-        assert agent2_cultures[0][0] == culture_ids[2], "Agent 2 culture should have correct ID"
+        # Verify Agent 2 culture IDs (second element in result)
+        assert len(result[1]) == 1, "Agent 2 should have exactly one culture ID"
+        agent2_culture_ids = result[1]
+        assert culture_ids[2] in agent2_culture_ids, "Agent 2 should contain third culture ID"
 
     @pytest.mark.integration
-    def test_get_agents_cultures_bulk_nonexistent_agents(self):
-        """Test get_agents_cultures_bulk with nonexistent agent IDs."""
-        result = get_agents_cultures_bulk([999, 1000])
+    def test_get_agents_cultures_ids_bulk_nonexistent_agents(self):
+        """Test get_agents_cultures_ids_bulk with nonexistent agent IDs."""
+        result = get_agents_cultures_ids_bulk([999, 1000])
         
         # Should return empty lists for nonexistent agents
         assert len(result) == 2, "Should return exactly two agent entries"
@@ -467,8 +463,8 @@ class TestAgentStore:
         assert result[1] == [], "Should return empty list for nonexistent agent 1000"
 
     @pytest.mark.integration
-    def test_get_agents_cultures_bulk_mixed_existing_nonexistent(self):
-        """Test get_agents_cultures_bulk with mix of existing and nonexistent agents."""
+    def test_get_agents_cultures_ids_bulk_mixed_existing_nonexistent(self):
+        """Test get_agents_cultures_ids_bulk with mix of existing and nonexistent agents."""
         # Create test agent and culture
         agent_ids = self._create_test_agents([
             {'name': 'Test Agent', 'memory_size': 5}
@@ -482,18 +478,18 @@ class TestAgentStore:
         
         # Request mix of existing and nonexistent agents
         request_ids = [999, agent_ids[0], 1000]
-        result = get_agents_cultures_bulk(request_ids)
+        result = get_agents_cultures_ids_bulk(request_ids)
         
         # Verify result
         assert len(result) == 3, "Should return exactly three agent entries"
         assert result[0] == [], "Should return empty list for nonexistent agent 999"
-        assert len(result[1]) == 1, "Should return one culture for existing agent"
-        assert result[1][0][0] == culture_ids[0], "Should return correct culture for existing agent"
+        assert len(result[1]) == 1, "Should return one culture ID for existing agent"
+        assert culture_ids[0] in result[1], "Should return correct culture ID for existing agent"
         assert result[2] == [], "Should return empty list for nonexistent agent 1000"
 
     @pytest.mark.integration
-    def test_get_agents_cultures_bulk_shared_cultures(self):
-        """Test get_agents_cultures_bulk with agents sharing cultures."""
+    def test_get_agents_cultures_ids_bulk_shared_cultures(self):
+        """Test get_agents_cultures_ids_bulk with agents sharing cultures."""
         # Create test agents and cultures
         agent_ids = self._create_test_agents([
             {'name': 'Agent 1', 'memory_size': 5},
@@ -510,14 +506,14 @@ class TestAgentStore:
         ]
         self._create_agent_culture_relationships(relationships)
         
-        # Get cultures in bulk
-        result = get_agents_cultures_bulk(agent_ids)
+        # Get culture IDs in bulk
+        result = get_agents_cultures_ids_bulk(agent_ids)
         
         # Verify result
         assert len(result) == 2, "Should return exactly two agent entries"
         
-        # Both agents should have the same culture
-        assert len(result[0]) == 1, "Agent 1 should have exactly one culture"
-        assert len(result[1]) == 1, "Agent 2 should have exactly one culture"
-        assert result[0][0][0] == culture_ids[0], "Agent 1 should have the shared culture"
-        assert result[1][0][0] == culture_ids[0], "Agent 2 should have the shared culture"
+        # Both agents should have the same culture ID
+        assert len(result[0]) == 1, "Agent 1 should have exactly one culture ID"
+        assert len(result[1]) == 1, "Agent 2 should have exactly one culture ID"
+        assert culture_ids[0] in result[0], "Agent 1 should have the shared culture ID"
+        assert culture_ids[0] in result[1], "Agent 2 should have the shared culture ID"

@@ -1,12 +1,11 @@
 # Myth algebra connector functions
 from .mythic_algebra_connector import (
+    insert_myth_to_agent_memory,
     get_myth_embeddings,
     get_myth_matrices_and_embedding_ids,
     recalc_and_update_myths,
     update_myth_with_retention,
 )
-from ..myth_store import get_myth, get_myths_bulk, update_myth, update_myths_bulk
-from ..mytheme_store import get_mythemes_bulk
 
 # Import mythicalgebra functions for testing
 try:
@@ -22,11 +21,7 @@ except ImportError:
     compute_myth_embedding = None
 
 __all__ = [
-    "get_myth",
-    "get_myths_bulk",
-    "get_mythemes_bulk",
-    "update_myth",
-    "update_myths_bulk",
+    "insert_myth_to_agent_memory",
     "get_myth_embeddings",
     "get_myth_matrices_and_embedding_ids",
     "recalc_and_update_myths",

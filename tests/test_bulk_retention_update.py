@@ -57,7 +57,8 @@ class TestBulkRetentionUpdate:
     
     def _insert_agent_myth(self, agent_id: int, myth_id: int, position: int, retention: float) -> bool:
         """Insert an agent_myth entry."""
-        return insert_agent_myth(myth_id, agent_id, position, retention)
+        from mythologizer_postgres.connectors import insert_agent_myth_safe
+        return insert_agent_myth_safe(myth_id, agent_id, retention)
     
     def _get_agent_myths_ordered(self, agent_id: int) -> List[Tuple[int, float, int]]:
         """Get agent myths ordered by position with myth_id, retention, and position."""
@@ -83,12 +84,12 @@ class TestBulkRetentionUpdate:
         self._insert_agent_myth(agent_id, myth_ids[1], 0, 0.5)  # will be assigned position 0, pushing myth_ids[0] to position 1
         self._insert_agent_myth(agent_id, myth_ids[2], 0, 0.1)  # will be assigned position 0, pushing others down
         
-        # Verify initial order (stack behavior: last inserted at position 0)
+        # Verify initial order (retention-based: highest retention at position 0)
         initial_order = self._get_agent_myths_ordered(agent_id)
         assert len(initial_order) == 3
-        assert initial_order[0][0] == myth_ids[2]  # myth_ids[2] at position 0 (last inserted)
-        assert initial_order[1][0] == myth_ids[1]  # myth_ids[1] at position 1
-        assert initial_order[2][0] == myth_ids[0]  # myth_ids[0] at position 2
+        assert initial_order[0][0] == myth_ids[1]  # myth_ids[1] at position 0 (highest retention 0.5)
+        assert initial_order[1][0] == myth_ids[0]  # myth_ids[0] at position 1 (retention 0.3)
+        assert initial_order[2][0] == myth_ids[2]  # myth_ids[2] at position 2 (lowest retention 0.1)
         
         # Update retentions: myth_ids[2] gets highest retention, myth_ids[0] gets lowest
         myth_retention_pairs = [
@@ -228,9 +229,9 @@ class TestBulkRetentionUpdate:
         # Verify no changes were made to this agent
         myths = self._get_agent_myths_ordered(agent_id)
         assert len(myths) == 2
-        # After insertion, myth_id2 is at position 0, myth_id1 is at position 1
-        assert myths[0][1] == 0.3  # myth_id2 retention unchanged
-        assert myths[1][1] == 0.5  # myth_id1 retention unchanged
+        # After retention-based reordering: myth_id1 (0.5) at position 0, myth_id2 (0.3) at position 1
+        assert myths[0][1] == 0.5  # myth_id1 retention unchanged
+        assert myths[1][1] == 0.3  # myth_id2 retention unchanged
     
     def test_update_retentions_and_reorder_large_number(self):
         """Test with a larger number of myths to ensure performance."""
@@ -276,9 +277,9 @@ class TestBulkRetentionUpdate:
         
         # Get initial state using memory store function
         initial_myth_ids, initial_retentions = get_myth_ids_and_retention_from_agents_memory(agent_id)
-        # Expected order: myth_ids[2] (last inserted), myth_ids[1], myth_ids[0]
-        expected_myth_ids = [myth_ids[2], myth_ids[1], myth_ids[0]]
-        expected_retentions = [0.1, 0.5, 0.3]
+        # Expected order: myth_ids[1] (highest retention 0.5), myth_ids[0] (0.3), myth_ids[2] (0.1)
+        expected_myth_ids = [myth_ids[1], myth_ids[0], myth_ids[2]]
+        expected_retentions = [0.5, 0.3, 0.1]
         assert initial_myth_ids == expected_myth_ids
         assert initial_retentions == expected_retentions
         

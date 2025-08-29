@@ -4,12 +4,14 @@ Tests that positions are correctly recalculated when retention values change
 and when new myths are inserted, ensuring highest retention is at top position.
 """
 
+import os
 import pytest
 import numpy as np
 from typing import List, Tuple
 from sqlalchemy import text
 
 from mythologizer_postgres.db import get_engine, clear_all_rows, session_scope
+from mythologizer_postgres.connectors import insert_agent_myth_safe
 
 
 class TestAgentMythsPositionRecalculation:
@@ -46,12 +48,13 @@ class TestAgentMythsPositionRecalculation:
 
     def _insert_agent_myth(self, myth_id: int, agent_id: int, position: int, retention: float):
         """Helper method to insert an agent_myth relationship."""
-        with session_scope() as session:
-            # Let the trigger handle position assignment
-            session.execute(text("""
-                INSERT INTO agent_myths (myth_id, agent_id, position, retention)
-                VALUES (:myth_id, :agent_id, 0, :retention)
-            """), {"myth_id": myth_id, "agent_id": agent_id, "retention": retention})
+        # Use safe function instead of trigger
+        success = insert_agent_myth_safe(
+            myth_id=myth_id,
+            agent_id=agent_id,
+            retention=retention
+        )
+        assert success, f"Failed to insert myth {myth_id} into agent {agent_id}"
 
     def _update_retention(self, myth_id: int, agent_id: int, new_retention: float):
         """Helper method to update retention value."""
@@ -97,18 +100,18 @@ class TestAgentMythsPositionRecalculation:
         
         assert len(results) == 3, "Should have 3 myths"
         
-        # Should be ordered by insertion order (LIFO - Last In, First Out)
-        # Position 0 = top of stack (last inserted)
-        # Position 2 = bottom of stack (first inserted)
-        assert results[0][0] == myth3, "Last inserted myth should be at position 0 (top)"
-        assert results[0][1] == 0.7, "Position 0 should have retention 0.7"
+        # Should be ordered by retention (highest retention = position 0)
+        # Position 0 = highest retention
+        # Position 2 = lowest retention
+        assert results[0][0] == myth2, "Highest retention myth should be at position 0 (top)"
+        assert results[0][1] == 0.9, "Position 0 should have retention 0.9"
         assert results[0][2] == 0, "Position should be 0"
         
-        assert results[1][0] == myth2, "Second inserted myth should be at position 1"
-        assert results[1][1] == 0.9, "Position 1 should have retention 0.9"
+        assert results[1][0] == myth3, "Second highest retention myth should be at position 1"
+        assert results[1][1] == 0.7, "Position 1 should have retention 0.7"
         assert results[1][2] == 1, "Position should be 1"
         
-        assert results[2][0] == myth1, "First inserted myth should be at position 2 (bottom)"
+        assert results[2][0] == myth1, "Lowest retention myth should be at position 2 (bottom)"
         assert results[2][1] == 0.5, "Position 2 should have retention 0.5"
         assert results[2][2] == 2, "Position should be 2"
 
@@ -127,11 +130,11 @@ class TestAgentMythsPositionRecalculation:
         self._insert_agent_myth(myth2, agent_id, 1, 0.7)
         self._insert_agent_myth(myth3, agent_id, 1, 0.9)
         
-        # Verify initial stack order (LIFO)
+        # Verify initial retention-based order
         results = self._get_agent_myths_ordered(agent_id)
-        assert results[0][0] == myth3, "Initial: myth3 should be at top (last inserted)"
-        assert results[1][0] == myth2, "Initial: myth2 should be in middle"
-        assert results[2][0] == myth1, "Initial: myth1 should be at bottom (first inserted)"
+        assert results[0][0] == myth3, "Initial: myth3 should be at top (highest retention 0.9)"
+        assert results[1][0] == myth2, "Initial: myth2 should be in middle (retention 0.7)"
+        assert results[2][0] == myth1, "Initial: myth1 should be at bottom (lowest retention 0.5)"
         
         # Update retention to change the order
         self._update_retention(myth1, agent_id, 0.95)  # Now highest
@@ -169,21 +172,22 @@ class TestAgentMythsPositionRecalculation:
         self._insert_agent_myth(myth2, agent_id, 1, 0.8)  # Same retention
         self._insert_agent_myth(myth3, agent_id, 1, 0.9)  # Higher retention
         
-        # Check initial stack order (LIFO)
+        # Check initial retention-based order
         results = self._get_agent_myths_ordered(agent_id)
         
         assert len(results) == 3, "Should have 3 myths"
         
-        # Initial stack order: myth3 (last inserted) at top
-        assert results[0][0] == myth3, "myth3 should be at top (last inserted)"
+        # Initial retention-based order: myth3 (highest retention 0.9) at top
+        assert results[0][0] == myth3, "myth3 should be at top (highest retention 0.9)"
         assert results[0][1] == 0.9, "Top should have retention 0.9"
         assert results[0][2] == 0, "Top should have position 0"
         
-        assert results[1][0] == myth2, "myth2 should be in middle"
+        # For tied retentions (0.8), the order is determined by myth_id ASC
+        assert results[1][0] == myth1, "myth1 should be in middle (tied retention 0.8, lower myth_id)"
         assert results[1][1] == 0.8, "Middle should have retention 0.8"
         assert results[1][2] == 1, "Middle should have position 1"
         
-        assert results[2][0] == myth1, "myth1 should be at bottom (first inserted)"
+        assert results[2][0] == myth2, "myth2 should be at bottom (tied retention 0.8, higher myth_id)"
         assert results[2][1] == 0.8, "Bottom should have retention 0.8"
         assert results[2][2] == 2, "Bottom should have position 2"
         
@@ -324,11 +328,11 @@ class TestAgentMythsPositionRecalculation:
         self._insert_agent_myth(myth1, agent_id, 1, 999999.0)
         self._insert_agent_myth(myth2, agent_id, 1, 999998.0)
         
-        # Check initial stack order (LIFO)
+        # Check initial retention-based order
         results = self._get_agent_myths_ordered(agent_id)
         assert len(results) == 2, "Should have 2 myths"
-        assert results[0][0] == myth2, "Second inserted should be at top"
-        assert results[1][0] == myth1, "First inserted should be at bottom"
+        assert results[0][0] == myth1, "myth1 should be at top (highest retention 999999.0)"
+        assert results[1][0] == myth2, "myth2 should be at bottom (retention 999998.0)"
         
         # Now trigger retention-based reordering
         from mythologizer_postgres.connectors import recalculate_agent_myth_positions_by_retention
@@ -355,12 +359,12 @@ class TestAgentMythsPositionRecalculation:
         self._insert_agent_myth(myth2, agent_id, 1, 0.5)
         self._insert_agent_myth(myth3, agent_id, 1, 0.5)
         
-        # Check initial stack order (LIFO)
+        # Check initial retention-based order (all retentions are 0.5, so ordered by myth_id ASC)
         results = self._get_agent_myths_ordered(agent_id)
         assert len(results) == 3, "Should have 3 myths"
-        assert results[0][0] == myth3, "Third inserted should be at top"
-        assert results[1][0] == myth2, "Second inserted should be in middle"
-        assert results[2][0] == myth1, "First inserted should be at bottom"
+        assert results[0][0] == myth1, "myth1 should be at top (lowest myth_id)"
+        assert results[1][0] == myth2, "myth2 should be in middle (middle myth_id)"
+        assert results[2][0] == myth3, "myth3 should be at bottom (highest myth_id)"
         
         # Now trigger retention-based reordering
         from mythologizer_postgres.connectors import recalculate_agent_myth_positions_by_retention
@@ -386,10 +390,10 @@ class TestAgentMythsPositionRecalculation:
         self._insert_agent_myth(myth1, agent_id, 1, 0.5)
         self._insert_agent_myth(myth2, agent_id, 1, 0.9)
         
-        # Verify initial stack order (LIFO)
+        # Verify initial retention-based order
         results = self._get_agent_myths_ordered(agent_id)
-        assert results[0][0] == myth2, "Initial: myth2 should be at top (last inserted)"
-        assert results[1][0] == myth1, "Initial: myth1 should be at bottom (first inserted)"
+        assert results[0][0] == myth2, "Initial: myth2 should be at top (highest retention 0.9)"
+        assert results[1][0] == myth1, "Initial: myth1 should be at bottom (lowest retention 0.5)"
         
         # Update to make retentions identical
         self._update_retention(myth1, agent_id, 0.9)
@@ -421,7 +425,7 @@ class TestAgentMythsPositionRecalculation:
         for i, (myth_id, retention) in enumerate(zip(myth_ids, retentions)):
             self._insert_agent_myth(myth_id, agent_id, 1, retention)
         
-        # Check initial stack order (LIFO)
+        # Check initial retention-based order
         results = self._get_agent_myths_ordered(agent_id)
         assert len(results) == 20, "Should have 20 myths"
         
@@ -492,12 +496,12 @@ class TestAgentMythsPositionRecalculation:
         self._insert_agent_myth(myth2, agent_id, 1, 0.9)  # Second inserted
         self._insert_agent_myth(myth3, agent_id, 1, 0.7)  # Third inserted
         
-        # Verify initial stack order (LIFO)
+        # Verify initial retention-based order
         results = self._get_agent_myths_ordered(agent_id)
-        # Position 0 = top (last inserted), Position 2 = bottom (first inserted)
-        assert results[0][0] == myth3, "Initial: myth3 should be at top (last inserted)"
-        assert results[1][0] == myth2, "Initial: myth2 should be in middle"
-        assert results[2][0] == myth1, "Initial: myth1 should be at bottom (first inserted)"
+        # Position 0 = highest retention, Position 2 = lowest retention
+        assert results[0][0] == myth2, "Initial: myth2 should be at top (highest retention 0.9)"
+        assert results[1][0] == myth3, "Initial: myth3 should be in middle (retention 0.7)"
+        assert results[2][0] == myth1, "Initial: myth1 should be at bottom (lowest retention 0.5)"
         
         # Manually trigger retention-based reordering
         success = recalculate_agent_myth_positions_by_retention(agent_id)
