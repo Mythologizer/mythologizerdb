@@ -5,6 +5,7 @@ from .mythic_algebra_connector import (
     get_myth_matrices_and_embedding_ids,
     recalc_and_update_myths,
     update_myth_with_retention,
+    add_myths_bulk,
 )
 
 # Import mythicalgebra functions for testing
@@ -29,4 +30,5 @@ __all__ = [
     "decompose_myth_matrix",
     "compose_myth_matrix",
     "compute_myth_embedding",
+    "add_myths_bulk",
 ] 

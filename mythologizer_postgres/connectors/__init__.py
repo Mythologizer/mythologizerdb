@@ -15,6 +15,7 @@ from .mythicalgebra.mythic_algebra_connector import (
     get_myth_matrices_and_embedding_ids,
     recalc_and_update_myths,
     update_myth_with_retention,
+    add_myths_bulk,
 )
 from .agent_attributes_def_store import insert_agent_attribute_defs, get_agent_attribute_defs
 from .agent_atributes_matrix_store import (
@@ -85,6 +86,7 @@ __all__ = [
     "get_myth_matrices_and_embedding_ids",
     "recalc_and_update_myths",
     "update_myth_with_retention",
+    "add_myths_bulk",
     # Agent attribute defs
     "insert_agent_attribute_defs",
     "get_agent_attribute_defs",

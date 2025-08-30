@@ -58,6 +58,30 @@ def insert_myth(
             for offset in offsets
         ]
     
+    # Remove duplicate embedding IDs and their corresponding offsets and weights
+    # Keep only the first occurrence of each duplicate
+    seen_ids = set()
+    unique_embedding_ids = []
+    unique_offsets = []
+    unique_weights = []
+    
+    for j, (emb_id, offset, weight) in enumerate(zip(embedding_ids, offsets, weights)):
+        if emb_id not in seen_ids:
+            seen_ids.add(emb_id)
+            unique_embedding_ids.append(emb_id)
+            unique_offsets.append(offset)
+            unique_weights.append(weight)
+    
+    # Update the variables to use the deduplicated data
+    original_length = len(embedding_ids)
+    embedding_ids = unique_embedding_ids
+    offsets = unique_offsets
+    weights = unique_weights
+    
+    # Log if duplicates were removed
+    if len(embedding_ids) < original_length:
+        print(f"DEBUG: insert_myth: Removed {original_length - len(embedding_ids)} duplicate embedding IDs")
+    
     # Validate input shapes
     if len(embedding_ids) != len(offsets) or len(offsets) != len(weights):
         raise ValueError("embedding_ids, offsets, and weights must have the same length")
@@ -152,6 +176,30 @@ def insert_myths_bulk(
             ]
             for offsets in offsets_list
         ]
+    
+    # Remove duplicate embedding IDs and their corresponding offsets and weights for each myth
+    for i in range(len(embedding_ids_list)):
+        seen_ids = set()
+        unique_embedding_ids = []
+        unique_offsets = []
+        unique_weights = []
+        
+        for j, (emb_id, offset, weight) in enumerate(zip(embedding_ids_list[i], offsets_list[i], weights_list[i])):
+            if emb_id not in seen_ids:
+                seen_ids.add(emb_id)
+                unique_embedding_ids.append(emb_id)
+                unique_offsets.append(offset)
+                unique_weights.append(weight)
+        
+        # Update the lists with deduplicated data
+        original_length = len(embedding_ids_list[i])
+        embedding_ids_list[i] = unique_embedding_ids
+        offsets_list[i] = unique_offsets
+        weights_list[i] = unique_weights
+        
+        # Log if duplicates were removed
+        if len(embedding_ids_list[i]) < original_length:
+            print(f"DEBUG: insert_myths_bulk myth {i}: Removed {original_length - len(embedding_ids_list[i])} duplicate embedding IDs")
     
     if len(main_embeddings) != len(embedding_ids_list) or len(main_embeddings) != len(offsets_list) or len(main_embeddings) != len(weights_list):
         raise ValueError("All input lists must have the same length")
@@ -292,6 +340,31 @@ def update_myth(
     if embedding_ids is not None:
         if isinstance(embedding_ids, np.ndarray):
             embedding_ids = embedding_ids.tolist()
+        
+        # Remove duplicate embedding IDs and their corresponding offsets and weights
+        if offsets is not None and weights is not None:
+            seen_ids = set()
+            unique_embedding_ids = []
+            unique_offsets = []
+            unique_weights = []
+            
+            for j, (emb_id, offset, weight) in enumerate(zip(embedding_ids, offsets, weights)):
+                if emb_id not in seen_ids:
+                    seen_ids.add(emb_id)
+                    unique_embedding_ids.append(emb_id)
+                    unique_offsets.append(offset)
+                    unique_weights.append(weight)
+            
+            # Update the variables to use the deduplicated data
+            original_length = len(embedding_ids)
+            embedding_ids = unique_embedding_ids
+            offsets = unique_offsets
+            weights = unique_weights
+            
+            # Log if duplicates were removed
+            if len(embedding_ids) < original_length:
+                print(f"DEBUG: update_myth {myth_id}: Removed {original_length - len(embedding_ids)} duplicate embedding IDs")
+        
         updates.append("embedding_ids = %s")
         params.append(embedding_ids)
     
@@ -423,6 +496,31 @@ def update_myths_bulk(
                 ]
                 for offsets in offsets_list
             ]
+    
+    # Remove duplicate embedding IDs and their corresponding offsets and weights for each myth
+    if embedding_ids_list is not None and offsets_list is not None and weights_list is not None:
+        for i in range(len(embedding_ids_list)):
+            seen_ids = set()
+            unique_embedding_ids = []
+            unique_offsets = []
+            unique_weights = []
+            
+            for j, (emb_id, offset, weight) in enumerate(zip(embedding_ids_list[i], offsets_list[i], weights_list[i])):
+                if emb_id not in seen_ids:
+                    seen_ids.add(emb_id)
+                    unique_embedding_ids.append(emb_id)
+                    unique_offsets.append(offset)
+                    unique_weights.append(weight)
+            
+            # Update the lists with deduplicated data
+            original_length = len(embedding_ids_list[i])
+            embedding_ids_list[i] = unique_embedding_ids
+            offsets_list[i] = unique_offsets
+            weights_list[i] = unique_weights
+            
+            # Log if duplicates were removed
+            if len(embedding_ids_list[i]) < original_length:
+                print(f"DEBUG: update_myths_bulk myth {myth_ids[i]}: Removed {original_length - len(embedding_ids_list[i])} duplicate embedding IDs")
     
     updated_count = 0
     

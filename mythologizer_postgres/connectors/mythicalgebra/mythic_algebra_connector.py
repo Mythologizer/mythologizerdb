@@ -50,6 +50,30 @@ def insert_myth_to_agent_memory(
     # Decompose the myth matrix to get embeddings, offsets, and weights
     embeddings, offsets, weights = decompose_myth_matrix(myth_matrix)
     
+    # Remove duplicate embedding IDs and their corresponding offsets and weights
+    # Keep only the first occurrence of each duplicate
+    seen_ids = set()
+    unique_embedding_ids = []
+    unique_offsets = []
+    unique_weights = []
+    
+    for j, (emb_id, offset, weight) in enumerate(zip(embedding_ids, offsets, weights)):
+        if emb_id not in seen_ids:
+            seen_ids.add(emb_id)
+            unique_embedding_ids.append(emb_id)
+            unique_offsets.append(offset)
+            unique_weights.append(weight)
+    
+    # Update the variables to use the deduplicated data
+    original_length = len(embedding_ids)
+    embedding_ids = unique_embedding_ids
+    offsets = np.array(unique_offsets, dtype=np.float32)
+    weights = np.array(unique_weights, dtype=np.float32)
+    
+    # Log if duplicates were removed
+    if len(embedding_ids) < original_length:
+        print(f"DEBUG: Agent {agent_id} myth: Removed {original_length - len(embedding_ids)} duplicate embedding IDs")
+    
     # Compute the main embedding if not provided
     if embedding is None:
         embedding = compute_myth_embedding(myth_matrix)
@@ -108,6 +132,27 @@ def get_myth_embeddings(myth_ids: Union[int, List[int]]) -> Union[NDArray[np.flo
         return main_embeddings
 
 
+def _clean_numeric_data(data):
+    """Clean numeric data by converting string representations to proper numeric types."""
+    if isinstance(data, str):
+        # Try to evaluate string as a list or array
+        try:
+            import ast
+            cleaned = ast.literal_eval(data)
+            return cleaned
+        except:
+            # If it's a single number string, convert to float
+            try:
+                return float(data)
+            except:
+                raise ValueError(f"Cannot convert string to numeric: {data[:50]}...")
+    elif isinstance(data, list):
+        return [_clean_numeric_data(item) for item in data]
+    elif isinstance(data, np.ndarray):
+        return data
+    else:
+        return data
+
 def get_myth_matrices_and_embedding_ids(myth_ids: Union[int, List[int]]) -> Union[Tuple[NDArray[np.floating], List[int]], List[Tuple[NDArray[np.floating], List[int]]]]:
     """
     Get the myth matrices and embedding IDs for one or more myths.
@@ -120,27 +165,6 @@ def get_myth_matrices_and_embedding_ids(myth_ids: Union[int, List[int]]) -> Unio
         Single (myth_matrix, embedding_ids) tuple or list of (myth_matrix, embedding_ids) tuples
     """
     
-    def _debug_data_types(data, name, myth_id=None):
-        """Helper function to debug data types and find string values."""
-        myth_prefix = f"myth {myth_id}: " if myth_id else ""
-        
-        if isinstance(data, (list, np.ndarray)):
-            for i, item in enumerate(data):
-                if isinstance(item, str):
-                    print(f"ERROR: {myth_prefix}{name}[{i}] is string: {item}")
-                    if item == '[':
-                        print(f"ERROR: {myth_prefix}FOUND THE PROBLEM: {name}[{i}] is '['")
-                elif isinstance(item, (list, np.ndarray)):
-                    for j, val in enumerate(item[:10]):  # Check first 10 values
-                        if isinstance(val, str):
-                            print(f"ERROR: {myth_prefix}{name}[{i}][{j}] is string: {val}")
-                            if val == '[':
-                                print(f"ERROR: {myth_prefix}FOUND THE PROBLEM: {name}[{i}][{j}] is '['")
-        elif isinstance(data, str):
-            print(f"ERROR: {myth_prefix}{name} is string: {data}")
-            if data == '[':
-                print(f"ERROR: {myth_prefix}FOUND THE PROBLEM: {name} is '['")
-    
     if isinstance(myth_ids, int):
         # Single myth
         try:
@@ -148,16 +172,7 @@ def get_myth_matrices_and_embedding_ids(myth_ids: Union[int, List[int]]) -> Unio
             if myth is None:
                 raise ValueError(f"Myth {myth_ids} not found")
             
-            # Debug myth data
-            print(f"DEBUG: Processing myth {myth_ids}")
-            print(f"DEBUG: myth['embedding_ids'] = {myth['embedding_ids']}")
-            print(f"DEBUG: myth['offsets'] type = {type(myth['offsets'])}, length = {len(myth['offsets']) if myth['offsets'] else 0}")
-            print(f"DEBUG: myth['weights'] = {myth['weights']}")
-            
-            # Check for string data in myth
-            _debug_data_types(myth['embedding_ids'], 'embedding_ids', myth_ids)
-            _debug_data_types(myth['offsets'], 'offsets', myth_ids)
-            _debug_data_types(myth['weights'], 'weights', myth_ids)
+
             
             # Get mytheme embeddings for the embedding IDs
             embedding_ids = myth["embedding_ids"]
@@ -169,47 +184,29 @@ def get_myth_matrices_and_embedding_ids(myth_ids: Union[int, List[int]]) -> Unio
                 missing_ids = set(embedding_ids) - set(mytheme_ids)
                 raise ValueError(f"Mythemes not found: {missing_ids}")
             
-            # Debug mytheme embeddings
-            print(f"DEBUG: Got {len(mytheme_embeddings)} mytheme embeddings")
-            _debug_data_types(mytheme_embeddings, 'mytheme_embeddings', myth_ids)
+
             
-            # Convert to numpy arrays with detailed error handling
-            try:
-                print(f"DEBUG: Converting embeddings to numpy...")
-                embeddings = np.array(mytheme_embeddings, dtype=np.float32)
-                print(f"DEBUG: Embeddings conversion successful: {embeddings.shape}")
-            except Exception as e:
-                print(f"ERROR: Failed to convert embeddings to numpy for myth {myth_ids}: {e}")
-                print(f"ERROR: Embeddings data: {mytheme_embeddings}")
-                raise
+            # Clean and convert to numpy arrays
+            cleaned_embeddings = _clean_numeric_data(mytheme_embeddings)
+            embeddings = np.array(cleaned_embeddings, dtype=np.float32)
             
-            try:
-                print(f"DEBUG: Converting offsets to numpy...")
-                offsets = np.array(myth["offsets"], dtype=np.float32)
-                print(f"DEBUG: Offsets conversion successful: {offsets.shape}")
-            except Exception as e:
-                print(f"ERROR: Failed to convert offsets to numpy for myth {myth_ids}: {e}")
-                print(f"ERROR: Offsets data: {myth['offsets']}")
-                raise
+            # Clean and handle case where offsets is a list of numpy arrays
+            cleaned_offsets = _clean_numeric_data(myth["offsets"])
+            if isinstance(cleaned_offsets, list) and len(cleaned_offsets) > 0:
+                if isinstance(cleaned_offsets[0], np.ndarray):
+                    # Already numpy arrays, just stack them
+                    offsets = np.stack(cleaned_offsets, axis=0)
+                else:
+                    # Convert to numpy array
+                    offsets = np.array(cleaned_offsets, dtype=np.float32)
+            else:
+                offsets = np.array(cleaned_offsets, dtype=np.float32)
             
-            try:
-                print(f"DEBUG: Converting weights to numpy...")
-                weights = np.array(myth["weights"], dtype=np.float32)
-                print(f"DEBUG: Weights conversion successful: {weights.shape}")
-            except Exception as e:
-                print(f"ERROR: Failed to convert weights to numpy for myth {myth_ids}: {e}")
-                print(f"ERROR: Weights data: {myth['weights']}")
-                raise
+            cleaned_weights = _clean_numeric_data(myth["weights"])
+            weights = np.array(cleaned_weights, dtype=np.float32)
             
-            # Compose myth matrix with error handling
-            try:
-                print(f"DEBUG: Composing myth matrix...")
-                myth_matrix = compose_myth_matrix(embeddings, offsets, weights)
-                print(f"DEBUG: Myth matrix composition successful: {myth_matrix.shape}")
-            except Exception as e:
-                print(f"ERROR: Failed to compose myth matrix for myth {myth_ids}: {e}")
-                print(f"ERROR: Input shapes - embeddings: {embeddings.shape}, offsets: {offsets.shape}, weights: {weights.shape}")
-                raise
+            # Compose myth matrix
+            myth_matrix = compose_myth_matrix(embeddings, offsets, weights)
             
             return (myth_matrix, embedding_ids)
             
@@ -253,61 +250,32 @@ def get_myth_matrices_and_embedding_ids(myth_ids: Union[int, List[int]]) -> Unio
             # Build myth matrices and collect embedding IDs
             result = []
             for i, (myth_id, embedding_ids, offsets, weights) in enumerate(zip(ids, embedding_ids_list, offsets_list, weights_list)):
-                try:
-                    print(f"DEBUG: Processing myth {myth_id} ({i+1}/{len(ids)})")
-                    
-                    # Debug data for this myth
-                    _debug_data_types(embedding_ids, 'embedding_ids', myth_id)
-                    _debug_data_types(offsets, 'offsets', myth_id)
-                    _debug_data_types(weights, 'weights', myth_id)
-                    
-                    # Get embeddings for this myth's embedding IDs
-                    embeddings = [mytheme_embeddings_dict[eid] for eid in embedding_ids]
-                    
-                    # Debug mytheme embeddings for this myth
-                    _debug_data_types(embeddings, 'embeddings', myth_id)
-                    
-                    # Convert to numpy arrays with error handling
-                    try:
-                        embeddings_array = np.array(embeddings, dtype=np.float32)
-                        print(f"DEBUG: Myth {myth_id} embeddings conversion successful: {embeddings_array.shape}")
-                    except Exception as e:
-                        print(f"ERROR: Failed to convert embeddings to numpy for myth {myth_id}: {e}")
-                        print(f"ERROR: Embeddings data: {embeddings}")
-                        raise
-                    
-                    try:
-                        offsets_array = np.array(offsets, dtype=np.float32)
-                        print(f"DEBUG: Myth {myth_id} offsets conversion successful: {offsets_array.shape}")
-                    except Exception as e:
-                        print(f"ERROR: Failed to convert offsets to numpy for myth {myth_id}: {e}")
-                        print(f"ERROR: Offsets data: {offsets}")
-                        raise
-                    
-                    try:
-                        weights_array = np.array(weights, dtype=np.float32)
-                        print(f"DEBUG: Myth {myth_id} weights conversion successful: {weights_array.shape}")
-                    except Exception as e:
-                        print(f"ERROR: Failed to convert weights to numpy for myth {myth_id}: {e}")
-                        print(f"ERROR: Weights data: {weights}")
-                        raise
-                    
-                    # Compose myth matrix with error handling
-                    try:
-                        myth_matrix = compose_myth_matrix(embeddings_array, offsets_array, weights_array)
-                        print(f"DEBUG: Myth {myth_id} matrix composition successful: {myth_matrix.shape}")
-                    except Exception as e:
-                        print(f"ERROR: Failed to compose myth matrix for myth {myth_id}: {e}")
-                        print(f"ERROR: Input shapes - embeddings: {embeddings_array.shape}, offsets: {offsets_array.shape}, weights: {weights_array.shape}")
-                        raise
-                    
-                    result.append((myth_matrix, embedding_ids))
-                    
-                except Exception as e:
-                    print(f"ERROR: Failed to process myth {myth_id} in batch: {e}")
-                    print(f"ERROR: Exception type: {type(e)}")
-                    # Continue with other myths instead of failing completely
-                    continue
+                # Get embeddings for this myth's embedding IDs
+                embeddings = [mytheme_embeddings_dict[eid] for eid in embedding_ids]
+                
+                # Clean and convert to numpy arrays
+                cleaned_embeddings = _clean_numeric_data(embeddings)
+                embeddings_array = np.array(cleaned_embeddings, dtype=np.float32)
+                
+                # Clean and handle case where offsets is a list of numpy arrays
+                cleaned_offsets = _clean_numeric_data(offsets)
+                if isinstance(cleaned_offsets, list) and len(cleaned_offsets) > 0:
+                    if isinstance(cleaned_offsets[0], np.ndarray):
+                        # Already numpy arrays, just stack them
+                        offsets_array = np.stack(cleaned_offsets, axis=0)
+                    else:
+                        # Convert to numpy array
+                        offsets_array = np.array(cleaned_offsets, dtype=np.float32)
+                else:
+                    offsets_array = np.array(cleaned_offsets, dtype=np.float32)
+                
+                cleaned_weights = _clean_numeric_data(weights)
+                weights_array = np.array(cleaned_weights, dtype=np.float32)
+                
+                # Compose myth matrix
+                myth_matrix = compose_myth_matrix(embeddings_array, offsets_array, weights_array)
+                
+                result.append((myth_matrix, embedding_ids))
             
             return result
             
@@ -455,6 +423,30 @@ def update_myth_with_retention(
     # Decompose the matrix
     embeddings, offsets, weights = decompose_myth_matrix(myth_matrix)
     
+    # Remove duplicate embedding IDs and their corresponding offsets and weights
+    # Keep only the first occurrence of each duplicate
+    seen_ids = set()
+    unique_embedding_ids = []
+    unique_offsets = []
+    unique_weights = []
+    
+    for j, (emb_id, offset, weight) in enumerate(zip(embedding_ids, offsets, weights)):
+        if emb_id not in seen_ids:
+            seen_ids.add(emb_id)
+            unique_embedding_ids.append(emb_id)
+            unique_offsets.append(offset)
+            unique_weights.append(weight)
+    
+    # Update the variables to use the deduplicated data
+    original_length = len(embedding_ids)
+    embedding_ids = unique_embedding_ids
+    offsets = np.array(unique_offsets, dtype=np.float32)
+    weights = np.array(unique_weights, dtype=np.float32)
+    
+    # Log if duplicates were removed
+    if len(embedding_ids) < original_length:
+        print(f"DEBUG: Myth {myth_id}: Removed {original_length - len(embedding_ids)} duplicate embedding IDs")
+    
     # Compute main embedding (use provided embedding if available)
     if embedding is not None:
         main_embedding = embedding
@@ -485,3 +477,110 @@ def update_myth_with_retention(
                 conn.commit()
     
     return update_success
+
+type myth_insertion = Tuple[List[int], NDArray[np.floating], NDArray[np.floating]]
+
+def add_myths_bulk(myths: List[myth_insertion]) -> List[int]:
+    """
+    Add multiple myths to the database.
+    
+    This function:
+    1. Takes a list of myth_insertion tuples (embedding_ids, offsets, weights)
+    2. Calculates the main embeddings for each myth using mythicalgebra
+    3. Inserts all myths into the database in bulk
+    
+    Args:
+        myths: List of myth_insertion tuples, where each tuple contains:
+            - embedding_ids: List[int] - List of embedding IDs for the myth
+            - offsets: NDArray[np.floating] - Offset vectors for the myth
+            - weights: NDArray[np.floating] - Weight values for the myth
+    
+    Returns:
+        List of inserted myth IDs
+    
+    Raises:
+        ValueError: If any myth data is invalid or if embedding calculation fails
+    """
+    if not myths:
+        return []
+    
+    # Import the bulk insertion function
+    from ..myth_store import insert_myths_bulk
+    
+    # Prepare data for bulk insertion
+    main_embeddings = []
+    embedding_ids_list = []
+    offsets_list = []
+    weights_list = []
+    
+    for i, (embedding_ids, offsets, weights) in enumerate(myths):
+        try:
+            # Validate inputs
+            if not embedding_ids:
+                raise ValueError(f"Myth {i} has no embedding IDs")
+            
+            if len(offsets) != len(weights) or len(offsets) != len(embedding_ids):
+                raise ValueError(f"Myth {i}: embedding_ids, offsets, and weights must have the same length")
+            
+            # Remove duplicate embedding IDs and their corresponding offsets and weights
+            # Keep only the first occurrence of each duplicate
+            seen_ids = set()
+            unique_embedding_ids = []
+            unique_offsets = []
+            unique_weights = []
+            
+            for j, (emb_id, offset, weight) in enumerate(zip(embedding_ids, offsets, weights)):
+                if emb_id not in seen_ids:
+                    seen_ids.add(emb_id)
+                    unique_embedding_ids.append(emb_id)
+                    unique_offsets.append(offset)
+                    unique_weights.append(weight)
+            
+            # Update the variables to use the deduplicated data
+            original_length = len(embedding_ids)
+            embedding_ids = unique_embedding_ids
+            offsets = np.array(unique_offsets, dtype=np.float32)
+            weights = np.array(unique_weights, dtype=np.float32)
+            
+            # Log if duplicates were removed
+            if len(embedding_ids) < original_length:
+                print(f"DEBUG: Myth {i}: Removed {original_length - len(embedding_ids)} duplicate embedding IDs")
+            
+            # Get mytheme embeddings for the embedding IDs
+            mytheme_ids, _, mytheme_embeddings = get_mythemes_bulk(embedding_ids)
+            
+            # Verify that all mytheme IDs were found (should be true after deduplication)
+            if len(mytheme_ids) != len(embedding_ids):
+                missing_ids = set(embedding_ids) - set(mytheme_ids)
+                raise ValueError(f"Myth {i}: Mythemes not found: {str(missing_ids)}")
+            
+            # Convert mytheme embeddings to numpy array
+            embeddings_array = np.array(mytheme_embeddings, dtype=np.float32)
+            
+            # Compose the myth matrix
+            myth_matrix = compose_myth_matrix(embeddings_array, offsets, weights)
+            
+            # Compute the main embedding
+            main_embedding = compute_myth_embedding(myth_matrix)
+            
+            # Add to bulk insertion lists
+            main_embeddings.append(main_embedding)
+            embedding_ids_list.append(embedding_ids)
+            offsets_list.append(offsets)
+            weights_list.append(weights)
+            
+        except Exception as e:
+            raise ValueError(f"Failed to process myth {i}: {e}")
+    
+    # Insert all myths in bulk
+    try:
+        myth_ids = insert_myths_bulk(
+            main_embeddings=main_embeddings,
+            embedding_ids_list=embedding_ids_list,
+            offsets_list=offsets_list,
+            weights_list=weights_list
+        )
+        return myth_ids
+    except Exception as e:
+        raise ValueError(f"Failed to insert myths in bulk: {e}")
+   
